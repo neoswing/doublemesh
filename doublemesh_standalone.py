@@ -6,6 +6,8 @@ Created on Wed Dec  8 11:31:42 2021
 @author: melnikov
 """
 
+__version__ = 1.2
+
 import os
 import sys
 import re
@@ -18,13 +20,16 @@ from matplotlib import pyplot as plt
 import numpy
 import lattice_vector_search
 
+import warnings
+warnings.filterwarnings("ignore")
+
 try:
     from workflow_lib import workflow_logging
     logger = workflow_logging.getLogger()
 except:
     import logging
     logger = logging.getLogger("test")
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.ERROR)
 
 
 
@@ -83,13 +88,8 @@ def analyseDoubleMeshscan(path):
 
     crystals1 = glob.glob('crystal_1_*.spot')
     crystals1.sort()
-
     crystals2 = glob.glob('crystal_2_*.spot')
     crystals2.sort()
-    
-    for name in crystals2:
-    	print(name)
-    	z = numpy.loadtxt(name, skiprows=1, dtype=float)
     
     crystals_mesh1 = [numpy.loadtxt(name, skiprows=1, dtype=float) for name in crystals1]
     crystals_mesh2 = [numpy.loadtxt(name, skiprows=1, dtype=float) for name in crystals2]
@@ -120,7 +120,7 @@ def analyseDoubleMeshscan(path):
     i = 0
     for spots in crystals_mesh1:
         spots = numpy.hstack((numpy.zeros((spots.shape[0], 1)), spots))
-        spots = spots[spots[:, -1]>spots[:, -1].max()/2.0]
+#        spots = spots[spots[:, -1]>spots[:, -1].max()/2.0]
 #        print(spots.shape)
         queue.put((spots, i))
         i += 1
@@ -141,7 +141,7 @@ def analyseDoubleMeshscan(path):
     i = 0
     for spots in crystals_mesh2:
         spots = numpy.hstack((numpy.zeros((spots.shape[0], 1)), spots))
-        spots = spots[spots[:, -1]>spots[:, -1].max()/2.0]
+#        spots = spots[spots[:, -1]>spots[:, -1].max()/2.0]
 #        print(spots.shape)
         queue.put((spots, i))
         i += 1
@@ -192,14 +192,41 @@ def analyseDoubleMeshscan(path):
     potentialMatches = numpy.hstack((potentialMatches, (potentialMatches[:, 3]>0.5).reshape(potentialMatches.shape[0], 1)))
     numpy.savetxt('dozorm_pair_final.dat', potentialMatches, fmt='%d %d %d %.2f %d')
     plt.close()
+    
+    print("Success")
+    print("Case#| Xtal1 | Xtal2 | Score | Y/N")
+    for item in potentialMatches:
+    	print("{0:2.0f}   |  {1:2.0f}   |  {2:2.0f}   | {3:1.2f}  | {4:1.0f}".format(item[0], item[1], item[2], item[3], item[4]))
 
     os.chdir(initialCWD)
 
 
+#try:
+#    path = sys.argv[1]
+#except:
+#    print("Error: Argument 1 is not recognised!\n\
+#          \n\
+#          Usage: ./doublemesh.py path_to_spots\n\
+#          \n\
+#          Help: ./doublemesh.py help")
+#    quit()
+#
+#if path=="help":
+#    print("Usage: ./doublemesh.py path_to_spots\n\
+#          \n\
+#          Help: ./doublemesh.py help")
+#
+#else:
+#
+#    analyseDoubleMeshscan(path)
 
-analyseDoubleMeshscan('./')
 
 
+
+
+#analyseDoubleMeshscan('./')
+analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20220203/PROCESSED_DATA/Sample-4-1-02/MeshScan_01/Workflow_20220203-135018/DozorM2_mesh-local-user_1_01')
+#analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20220608/PROCESSED_DATA/test/test-test/MeshScan_02/Workflow_20220608-115431/DozorM2_mesh-test-test_1_01')
 #start = time.time()
 #
 #
