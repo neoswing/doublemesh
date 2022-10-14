@@ -6,7 +6,7 @@ Created on Wed Dec  8 11:31:42 2021
 @author: melnikov
 """
 
-__version__ = 1.2
+__version__ = 1.3
 
 
 import os
@@ -109,7 +109,12 @@ def analyseDoubleMeshscan(path):
     
     angle_delta = angle_delta*3.14/180.0
     
-    potentialMatches = numpy.loadtxt('dozorm_pair.dat')
+    
+    input_table = numpy.loadtxt('coordinat_list.dat', skiprows=0)
+    
+    
+#    potentialMatches = numpy.loadtxt('dozorm_pair.dat')
+    potentialMatches = input_table[:, [0,1,2]]
     potentialMatches = numpy.hstack((potentialMatches, numpy.zeros((potentialMatches.shape[0], 2))))
     
     manager = mp.Manager()
@@ -196,49 +201,86 @@ def analyseDoubleMeshscan(path):
         
 
     potentialMatches = numpy.hstack((potentialMatches, (potentialMatches[:, 3]>0.5).reshape(potentialMatches.shape[0], 1)))
+
+
+    potentialMatches = numpy.hstack((potentialMatches, numpy.zeros((potentialMatches.shape[0], 1))))
+
     
-    print("Success")
-    print("Case#| Xtal1 | Xtal2 | Score | Confidence | Y/N")
+    treated = numpy.array([], dtype='int')
+    for cycle in range(1000):
+        verified = numpy.delete(potentialMatches, treated, axis=0)
+#        print(verified)
+        verified = verified[verified[:, 5].astype(bool)]
+        if verified.size>0:
+            x = verified[numpy.argmax(verified[:, 3]), 0].astype(int) - 1
+#            print(x)
+        else:
+            break
+        potentialMatches[x, 6] = 1
+        
+        cr1 = potentialMatches[x, 1]
+        cr2 = potentialMatches[x, 2]
+        
+        excl = numpy.unique(numpy.append(numpy.where(potentialMatches[:, 1]==cr1)[0],
+                            numpy.where(potentialMatches[:, 2]==cr2)[0]))
+#        print(excl)
+        treated = numpy.append(treated, excl)
+#        print(treated)
+
+
+
+# adding aperture
+    potentialMatches = numpy.hstack((potentialMatches, input_table[:, [4, 5, 6, 7]]))
+#    commands = ['mv(sampx, {0:.4f}, sampy, {1:.4f}, phiy, {2:.4f})'.format(item[8], item[9], item[10]) for item in potentialMatches]
+    
+#potentialMatches: Case Xtal1 Xtal2 MatchScore Confidence Y/N Collect? Aperture SampX SampY PhiY
+    
+    print("Calculation finished!")
+    print("Case#| Xtal1 | Xtal2 | Score | Confidence | Y/N |  Collect ? | Beam size |        Center command  ")
     for item in potentialMatches:
-    	print("{0:2.0f}   |  {1:2.0f}   |  {2:2.0f}   | {3:1.2f}  |  {4:>7s}   |  {5:1.0f}".format(item[0], item[1], item[2], item[3], format(item[4], '4.2f'), item[5]))
+    	print("{0:2.0f}   |  {1:2.0f}   |  {2:2.0f}   | {3:1.2f}  |  {4:>7s}   |  {5}  |     {6}      |     {7:.0f}    |  {8} ".format(item[0], item[1], item[2], item[3],
+                           format(item[4], '4.2f'), 'Y' if item[5].astype(bool) else 'N', 'Y' if item[6].astype(bool) else ' ',
+                           item[7], 'mv(sampx, {0:.4f}, sampy, {1:.4f}, phiy, {2:.4f})'.format(item[8], item[9], item[10])))
     
-    numpy.savetxt('dozorm_pair_final.dat', potentialMatches, fmt='%d %d %d %.2f %3.2f %d')
+    
+    numpy.savetxt('dozorm_pair_final.dat', potentialMatches, fmt='%d %d %d %.2f %3.2f %d %d %3d %1.4f %1.4f %1.4f')
     plt.close()
 
     os.chdir(initialCWD)
 
 
-#try:
-#    path = sys.argv[1]
-#except:
-#    print("Error: Argument 1 is not recognised!\n\
-#          \n\
-#          Usage: ./doublemesh.py path_to_spots\n\
-#          \n\
-#          Help: ./doublemesh.py help")
-#    quit()
-#
-#if path=="help":
-#    print("Usage: ./doublemesh.py path_to_spots\n\
-#          \n\
-#          Help: ./doublemesh.py help")
-#
-#else:
-#
-#    analyseDoubleMeshscan(path)
+
+
+#start = time.time()
 
 
 
-
+#matplotlib.use('Agg')
 
 #analyseDoubleMeshscan('./')
 #analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20220203/PROCESSED_DATA/Sample-4-1-02/MeshScan_01/Workflow_20220203-135018/DozorM2_mesh-local-user_1_01')
+#analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20220608/PROCESSED_DATA/test/test-test/MeshScan_02/Workflow_20220608-115431/DozorM2_mesh-test-test_1_01')
 
-#start = time.time()
+#potentialMatches = numpy.loadtxt('/data/id23eh1/inhouse/opid231/20220203/PROCESSED_DATA/Sample-4-1-02/MeshScan_01/Workflow_20220203-135018/DozorM2_mesh-local-user_1_01/test.dat',
+#                                 skiprows=5)[:, [0,2,3]]
+#print(potentialMatches[potentialMatches[:, 2]>2])
+#x = numpy.unique(potentialMatches[:, 1], return_counts=True)
 #
-#
-#
-#analyseDoubleMeshscan('/home/esrf/melnikov/test_double_meshscan')
-#
-#
+#print(x[0][x[1]>1])
+
 #logger.info('Elapsed: {:.2f}s'.format(time.time()-start))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
