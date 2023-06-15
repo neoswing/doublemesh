@@ -6,8 +6,9 @@ Created on Wed Dec  8 11:31:42 2021
 @author: melnikov
 """
 
-__version__ = 1.3
+__version__ = 1.6
 
+'''fixed crystal pair assignment'''
 
 import os
 import sys
@@ -30,7 +31,7 @@ try:
 except:
     import logging
     logger = logging.getLogger("test")
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
 
 
 
@@ -110,7 +111,7 @@ def analyseDoubleMeshscan(path):
     angle_delta = angle_delta*3.14/180.0
     
     
-    input_table = numpy.loadtxt('coordinat_list.dat', skiprows=0)
+    input_table = numpy.loadtxt('coordinat_list.dat', skiprows=0, ndmin=2)
     
     
 #    potentialMatches = numpy.loadtxt('dozorm_pair.dat')
@@ -212,8 +213,10 @@ def analyseDoubleMeshscan(path):
 #        print(verified)
         verified = verified[verified[:, 5].astype(bool)]
         if verified.size>0:
-            x = verified[numpy.argmax(verified[:, 3]), 0].astype(int) - 1
-#            print(x)
+            thrsh = numpy.percentile(verified[:, 3], 99)
+            candidates = verified[verified[:, 3]>=thrsh]
+            x = verified[numpy.argmax(candidates[:, 4]), 0].astype(int) - 1
+            print(x)
         else:
             break
         potentialMatches[x, 6] = 1
@@ -230,24 +233,27 @@ def analyseDoubleMeshscan(path):
 
 
 # adding aperture
-    potentialMatches = numpy.hstack((potentialMatches, input_table[:, [4, 5, 6, 7]]))
+    potentialMatches = numpy.hstack((potentialMatches, input_table[:, [4, 5, 6, 7, 8]]))
 #    commands = ['mv(sampx, {0:.4f}, sampy, {1:.4f}, phiy, {2:.4f})'.format(item[8], item[9], item[10]) for item in potentialMatches]
     
 #potentialMatches: Case Xtal1 Xtal2 MatchScore Confidence Y/N Collect? Aperture SampX SampY PhiY
     
     print("Calculation finished!")
-    print("Case#| Xtal1 | Xtal2 | Score | Confidence | Y/N |  Collect ? | Beam size |        Center command  ")
+    print("Case# | Xtal1 | Xtal2 |  Score  | Confidence | Y/N | Collect? | Resolution | Beam size |        Center command  ")
     for item in potentialMatches:
-    	print("{0:2.0f}   |  {1:2.0f}   |  {2:2.0f}   | {3:1.2f}  |  {4:>7s}   |  {5}  |     {6}      |     {7:.0f}    |  {8} ".format(item[0], item[1], item[2], item[3],
-                           format(item[4], '4.2f'), 'Y' if item[5].astype(bool) else 'N', 'Y' if item[6].astype(bool) else ' ',
-                           item[7], 'mv(sampx, {0:.4f}, sampy, {1:.4f}, phiy, {2:.4f})'.format(item[8], item[9], item[10])))
+    	print("{0:3.0f}   | {1:3.0f}   | {2:3.0f}   |  {3:4.2f}   |  {4:>7s}   |  {5}  |    {6}     |    {7:.2f}    |     {8:.0f}    |  {9} ".format(item[0], item[1], item[2], item[3],
+                               format(item[4], '4.2f'), 'Y' if item[5].astype(bool) else 'N', 'Y' if item[6].astype(bool) else ' ', item[7],
+                               item[8], 'mv(sampx, {0:.4f}, sampy, {1:.4f}, phiy, {2:.4f})'.format(item[9], item[10], item[11])))
     
     
-    numpy.savetxt('dozorm_pair_final.dat', potentialMatches, fmt='%d %d %d %.2f %3.2f %d %d %3d %1.4f %1.4f %1.4f')
+#    numpy.savetxt('dozorm_pair_final.dat', potentialMatches, fmt='%d %d %d %.2f %3.2f %d %d %1.4f %3d %1.4f %1.4f %1.4f')
     plt.close()
 
     os.chdir(initialCWD)
-
+    
+#    collectPosition columns: 0_beam_size 1_sampx 2_sampy 3_phiy
+    collectPositions = potentialMatches[potentialMatches[:, 6].astype(bool)][:, 8:]
+    return collectPositions, potentialMatches
 
 
 
