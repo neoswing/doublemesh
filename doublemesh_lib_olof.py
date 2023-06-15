@@ -6,25 +6,20 @@ Created on Wed Dec  8 11:31:42 2021
 @author: melnikov
 """
 
-__version__ = 1.6
+__version__ = 1.5
 
-'''fixed crystal pair assignment'''
 
 import os
-#import sys
+import sys
 import re
 import glob
-#import time
+import time
 import multiprocessing as mp
-#import matplotlib
+import matplotlib
 #matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 import numpy
-try:
-    import lattice_vector_search
-except ModuleNotFoundError:
-    from bes.workflow_lib import lattice_vector_search
-
+from bes.workflow_lib import lattice_vector_search
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -74,6 +69,7 @@ def findPlanes_MP(queue, BeamCenter, Wavelength, DetectorDistance, DetectorPixel
     global Buffer
     while True:
         spots, crystal_n = queue.get()
+#        print(spots)
         if not isinstance(spots, numpy.ndarray):
             break
 
@@ -93,7 +89,6 @@ def analyseDoubleMeshscan(path):
         import logging
         logger = logging.getLogger("test")
         logger.setLevel(logging.INFO)
-
 
     global Buffer
     initialCWD = os.getcwd()
@@ -121,7 +116,9 @@ def analyseDoubleMeshscan(path):
     
     angle_delta = angle_delta*3.14/180.0
     
+    
     input_table = numpy.loadtxt('coordinat_list.dat', skiprows=0, ndmin=2)
+    
     
 #    potentialMatches = numpy.loadtxt('dozorm_pair.dat')
     potentialMatches = input_table[:, [0,1,2]]
@@ -183,6 +180,8 @@ def analyseDoubleMeshscan(path):
         i = line[1] - 1
         j = line[2] - 1
         
+#        print(i, j)
+        
         vectorsi = Buffer0[i][0]
         vectorsj = Buffer[j][0]
         
@@ -217,13 +216,11 @@ def analyseDoubleMeshscan(path):
     treated = numpy.array([], dtype='int')
     for cycle in range(1000):
         verified = numpy.delete(potentialMatches, treated, axis=0)
-
+#        print(verified)
         verified = verified[verified[:, 5].astype(bool)]
         if verified.size>0:
-            thrsh = numpy.percentile(verified[:, 3], 99)
-            candidates = verified[verified[:, 3]>=thrsh]
-            x = verified[numpy.argmax(candidates[:, 4]), 0].astype(int) - 1
-
+            x = verified[numpy.argmax(verified[:, 3]), 0].astype(int) - 1
+#            print(x)
         else:
             break
         potentialMatches[x, 6] = 1
@@ -233,9 +230,9 @@ def analyseDoubleMeshscan(path):
         
         excl = numpy.unique(numpy.append(numpy.where(potentialMatches[:, 1]==cr1)[0],
                             numpy.where(potentialMatches[:, 2]==cr2)[0]))
-
+#        print(excl)
         treated = numpy.append(treated, excl)
-
+#        print(treated)
 
 
 
@@ -243,14 +240,14 @@ def analyseDoubleMeshscan(path):
     potentialMatches = numpy.hstack((potentialMatches, input_table[:, [4, 5, 6, 7, 8]]))
 #    commands = ['mv(sampx, {0:.4f}, sampy, {1:.4f}, phiy, {2:.4f})'.format(item[8], item[9], item[10]) for item in potentialMatches]
     
-#potentialMatches: Case Xtal1 Xtal2 MatchScore Confidence Y/N Collect? Resolution BeamSize SampX SampY PhiY
+#potentialMatches: Case Xtal1 Xtal2 MatchScore Confidence Y/N Collect? Aperture SampX SampY PhiY
     
     logger.info("Calculation finished!")
     logger.info("Case# | Xtal1 | Xtal2 |  Score  | Confidence | Y/N | Collect? | Resolution | Beam size |        Center command  ")
     for item in potentialMatches:
     	logger.info("{0:3.0f}   | {1:3.0f}   | {2:3.0f}   |  {3:4.2f}   |  {4:>7s}   |  {5}  |    {6}     |    {7:.2f}    |     {8:3.0f}   |  {9} ".format(item[0], item[1], item[2], item[3],
-                     format(item[4], '4.2f'), 'Y' if item[5].astype(bool) else 'N', 'Y' if item[6].astype(bool) else ' ', item[7],
-                     item[8], 'mv(sampx, {0:.4f}, sampy, {1:.4f}, phiy, {2:.4f})'.format(item[9], item[10], item[11])))
+                               format(item[4], '4.2f'), 'Y' if item[5].astype(bool) else 'N', 'Y' if item[6].astype(bool) else ' ', item[7],
+                               item[8], 'mv(sampx, {0:.4f}, sampy, {1:.4f}, phiy, {2:.4f})'.format(item[9], item[10], item[11])))
     
     
 #    numpy.savetxt('dozorm_pair_final.dat', potentialMatches, fmt='%d %d %d %.2f %3.2f %d %d %1.4f %3d %1.4f %1.4f %1.4f')
@@ -260,7 +257,6 @@ def analyseDoubleMeshscan(path):
     
 #    collectPosition columns: 0_resolution 1_beam_size 2_sampx 3_sampy 4_phiy
     collectPositions = potentialMatches[potentialMatches[:, 6].astype(bool)][:, 7:]
-
     return collectPositions, potentialMatches
 
 
