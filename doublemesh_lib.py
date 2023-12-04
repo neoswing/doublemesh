@@ -6,9 +6,9 @@ Created on Wed Dec  8 11:31:42 2021
 @author: melnikov
 """
 
-__version__ = 1.6
+__version__ = 1.7
 
-'''fixed crystal pair assignment'''
+'''easier criterion for matching'''
 
 import os
 #import sys
@@ -288,8 +288,8 @@ def analyseDoubleMeshscan(path):
 
 
 
-
-
+#30092023
+#analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20230926/PROCESSED_DATA/br/br-br4/run_01_MeshScan/Workflow_20230926-195834/DozorM2_mesh-br-br4_1_2_01')
 
 
 

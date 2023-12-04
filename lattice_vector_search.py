@@ -226,7 +226,7 @@ def find_planes(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
             score = (fourier[peak] - noise.mean()) / (5*noise.std())
             
             logger.debug('Score for direction: {:.2f}'.format(score))
-            if score>=1:
+            if score>=0.3:#>=1:
                 vectors.append(numpy.hstack((w*maindirectionXYZ, score)))
             else:
                 logger.info('Score is too low, aborting this direction: {:.2f}'.format(score))

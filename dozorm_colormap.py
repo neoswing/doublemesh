@@ -28,7 +28,7 @@ from scipy import ndimage, signal
 #        if re.search('Map of Scores', line):
 #            i = -3
 #        
-#        if i>0:
+#        if i>=0:
 ##            print(numpy.array(re.findall('.{6}', line[5:])).astype(float).size)
 #            Dtable[i, :] = numpy.array(re.findall('.{6}', line[5:])).astype(float)
 #
@@ -45,7 +45,7 @@ from scipy import ndimage, signal
 #        if re.search('Map of Crystals', line):
 #            i = -3
 #        
-#        if i>0:
+#        if i>=0:
 ##            print(numpy.array(re.findall('.{4}', line[5:])).astype(int).size)
 #            Ztable[i, :] = numpy.array(re.findall('.{4}', line[5:])).astype(int)
 #
@@ -60,7 +60,7 @@ from scipy import ndimage, signal
 ##    plt.show()
 #
 #    return Dtable, Ztable
-
+#
 #parser('/data/id23eh1/inhouse/opid231/20230801/PROCESSED_DATA/DOZORM2_TESTMB/1/MeshScan_01/Workflow_20230801-114054/DozorM2_mesh-mb_1_01/dozorm_001.map')
 
 def ConstructColorlist(array):
@@ -124,12 +124,9 @@ def MainPlot(crystalN_array, dozorscore_array):
     
     clrs = ConstructColorlist(Ztable)
 
-    Ncolors = len(clrs)
     cmap = colors.ListedColormap([colors.to_rgba(str(i)) for i in clrs])
-    bounds = numpy.linspace(-2, Ncolors - 2, Ncolors + 1)
-    norm = colors.BoundaryNorm(bounds, ncolors=Ncolors)
     if numpy.max(Ztable>0):
-        plt.imshow(Ztable, cmap=cmap, norm=norm, interpolation='nearest', origin='upper', \
+        plt.imshow(Ztable, cmap=cmap, interpolation='nearest', origin='upper', \
                    extent=[0.5, (col + 0.5), (row + 0.5), 0.5])
             
         m = int(round(numpy.log10(numpy.max(Dtable))-2, 0))
@@ -168,15 +165,16 @@ def MainPlot(crystalN_array, dozorscore_array):
     plt.xticks(numpy.arange(1, Ztable.shape[1]+1, 2), rotation=45)
     plt.yticks(numpy.arange(1, Ztable.shape[0]+1, 2))
     plt.savefig('CrystalMap.png', dpi=150)
-#    plt.show()
+    plt.show()
     plt.close()
 
 
 
 
 #tests
-#    
+    
 #D, Z = parser('/data/id23eh1/inhouse/opid231/20230801/PROCESSED_DATA/DOZORM2_TESTMB/1/MeshScan_01/Workflow_20230801-114054/DozorM2_mesh-mb_1_01/dozorm_001.map')
+#D, Z = parser('/opt/pxsoft/mxworkflows/id30a2/edna2/tests/test_tasks/DozorM2/data/dozorm_001.map')
 #
 #MainPlot(Z, D)
 #
