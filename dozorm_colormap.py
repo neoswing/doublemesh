@@ -124,8 +124,8 @@ def MainPlot(crystalN_array, dozorscore_array):
     
     clrs = ConstructColorlist(Ztable)
     cmap = colors.ListedColormap([colors.to_rgba(str(i)) for i in clrs])
-    bounds = numpy.arange(-2, int(numpy.max(Ztable))+1)
-    norm = colors.BoundaryNorm(bounds, numpy.unique(clrs).size)
+    bounds = numpy.arange(-2.5, int(numpy.max(Ztable))+1)
+    norm = colors.BoundaryNorm(bounds, len(clrs))
     if numpy.max(Ztable>0):
         plt.imshow(Ztable, cmap=cmap, norm=norm, interpolation='nearest', origin='upper', \
                    extent=[0.5, (col + 0.5), (row + 0.5), 0.5])
@@ -176,9 +176,9 @@ def MainPlot(crystalN_array, dozorscore_array):
     
 #D, Z = parser('/data/id23eh1/inhouse/opid231/20230801/PROCESSED_DATA/DOZORM2_TESTMB/1/MeshScan_01/Workflow_20230801-114054/DozorM2_mesh-mb_1_01/dozorm_001.map')
 #D, Z = parser('/opt/pxsoft/mxworkflows/id30a2/edna2/tests/test_tasks/DozorM2/data/dozorm_001.map')
-D, Z = parser('/home/esrf/melnikov/spyder/test/dozorm_001.map')
-
-MainPlot(Z, D)
+#D, Z = parser('/home/esrf/melnikov/spyder/test/dozorm_001.map')
+#
+#MainPlot(Z, D)
 #
 #
 #for item in glob.glob('dozor*.map'):
