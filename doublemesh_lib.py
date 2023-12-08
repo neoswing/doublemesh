@@ -6,9 +6,9 @@ Created on Wed Dec  8 11:31:42 2021
 @author: melnikov
 """
 
-__version__ = 1.7
+__version__ = 1.8
 
-'''easier criterion for matching'''
+'''added output (all) in case no matches have been found'''
 
 import os
 #import sys
@@ -281,7 +281,7 @@ def analyseDoubleMeshscan(path):
 #analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20220203/PROCESSED_DATA/Sample-4-1-02/MeshScan_01/Workflow_20220203-135018/DozorM2_mesh-local-user_1_01')
 #analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20220608/PROCESSED_DATA/test/test-test/MeshScan_02/Workflow_20220608-115431/DozorM2_mesh-test-test_1_01')
 
-analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20231207/PROCESSED_DATA/Sample-2-2-02/run_01_MeshScan/Workflow_20231207-143206/DozorM2_mesh-opid231_1_2_01')
+#analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20231207/PROCESSED_DATA/Sample-2-2-02/run_01_MeshScan/Workflow_20231207-143206/DozorM2_mesh-opid231_1_2_01')
 
 
 #potentialMatches = numpy.loadtxt('/data/id23eh1/inhouse/opid231/20220203/PROCESSED_DATA/Sample-4-1-02/MeshScan_01/Workflow_20220203-135018/DozorM2_mesh-local-user_1_01/test.dat',
