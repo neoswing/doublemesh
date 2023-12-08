@@ -37,7 +37,7 @@ def extractDozorMetadata(datfilename):
     except:
         import logging
         logger = logging.getLogger("test")
-        logger.setLevel(logging.INFO)
+        logger.setLevel(logging.DEBUG)
 
     with open(datfilename, 'r') as metadata:
         lines = metadata.readlines()
@@ -92,7 +92,7 @@ def analyseDoubleMeshscan(path):
     except:
         import logging
         logger = logging.getLogger("test")
-        logger.setLevel(logging.INFO)
+        logger.setLevel(logging.DEBUG)
 
 
     global Buffer
@@ -172,9 +172,10 @@ def analyseDoubleMeshscan(path):
     for worker in workers:
         worker.join()
     
-#    print(Buffer1[0])
-#    print(Buffer[0])
-    
+    print(Buffer0[0])
+    print(Buffer[0])
+    logger.debug('\n\n\n--------Finished with identifying plane vectors--------\n\n\n')
+
     
     for line in potentialMatches:
         matches = []
@@ -245,6 +246,11 @@ def analyseDoubleMeshscan(path):
     
 #potentialMatches: Case Xtal1 Xtal2 MatchScore Confidence Y/N Collect? Resolution BeamSize SampX SampY PhiY
     
+#If no certain positions have been identified:
+    if numpy.all(potentialMatches[:, 6]==False):
+        potentialMatches[:, 6] = numpy.ones(potentialMatches[:, 6].size).astype(bool)
+    
+    
     logger.info("Calculation finished!")
     logger.info("Case# | Xtal1 | Xtal2 |  Score  | Confidence | Y/N | Collect? | Resolution | Beam size |        Center command  ")
     for item in potentialMatches:
@@ -274,6 +280,9 @@ def analyseDoubleMeshscan(path):
 #analyseDoubleMeshscan('./')
 #analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20220203/PROCESSED_DATA/Sample-4-1-02/MeshScan_01/Workflow_20220203-135018/DozorM2_mesh-local-user_1_01')
 #analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20220608/PROCESSED_DATA/test/test-test/MeshScan_02/Workflow_20220608-115431/DozorM2_mesh-test-test_1_01')
+
+analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20231207/PROCESSED_DATA/Sample-2-2-02/run_01_MeshScan/Workflow_20231207-143206/DozorM2_mesh-opid231_1_2_01')
+
 
 #potentialMatches = numpy.loadtxt('/data/id23eh1/inhouse/opid231/20220203/PROCESSED_DATA/Sample-4-1-02/MeshScan_01/Workflow_20220203-135018/DozorM2_mesh-local-user_1_01/test.dat',
 #                                 skiprows=5)[:, [0,2,3]]
