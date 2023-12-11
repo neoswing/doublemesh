@@ -8,7 +8,7 @@ Created on Wed Dec  8 11:31:42 2021
 
 __version__ = 1.8
 
-'''added output (all) in case no matches have been found'''
+'''added output as first position in case no matches have been found'''
 
 import os
 #import sys
@@ -118,7 +118,7 @@ def analyseDoubleMeshscan(path):
                                                                                                                                  DetectorDistance,
                                                                                                                                  DetectorPixel,
                                                                                                                                  angle_delta))
-    
+
     angle_delta = angle_delta*3.14/180.0
     
     input_table = numpy.loadtxt('coordinat_list.dat', skiprows=0, ndmin=2)
@@ -171,11 +171,19 @@ def analyseDoubleMeshscan(path):
         worker.start()
     for worker in workers:
         worker.join()
-    
-    print(Buffer0[0])
-    print(Buffer[0])
-    logger.debug('\n\n\n--------Finished with identifying plane vectors--------\n\n\n')
 
+    logger.debug('\n\n\n--------Finished with identifying plane vectors--------\n\n\n')
+    logger.debug('Identified vectors for \033[1;32;47mmesh1\033[0m:\n')
+    for i in range(len(crystals1)):
+        logger.debug('\033[1;32;47mCrystal {0:03d}:\033[0m'.format(i+1))
+        for vector in Buffer0[i][0]:
+            logger.debug('{0:03.1f} {1:03.1f} {2:03.1f} score {3:.1f}'.format(*list(vector)))
+
+    logger.debug('Identified vectors for \033[1;34;47mmesh2\033[0m:\n')
+    for i in range(len(crystals2)):
+        logger.debug('\033[1;34;47mCrystal {0:03d}:\033[0m'.format(i+1))
+        for vector in Buffer[i][0]:
+            logger.debug('{0:03.1f} {1:03.1f} {2:03.1f} score {3:.1f}'.format(*list(vector)))
     
     for line in potentialMatches:
         matches = []
@@ -243,15 +251,14 @@ def analyseDoubleMeshscan(path):
 # adding aperture
     potentialMatches = numpy.hstack((potentialMatches, input_table[:, [4, 5, 6, 7, 8]]))
 #    commands = ['mv(sampx, {0:.4f}, sampy, {1:.4f}, phiy, {2:.4f})'.format(item[8], item[9], item[10]) for item in potentialMatches]
-    
+    logger.info("Calculation finished!")
 #potentialMatches: Case Xtal1 Xtal2 MatchScore Confidence Y/N Collect? Resolution BeamSize SampX SampY PhiY
     
 #If no certain positions have been identified:
     if numpy.all(potentialMatches[:, 6]==False):
-        potentialMatches[:, 6] = numpy.ones(potentialMatches[:, 6].size).astype(bool)
-    
-    
-    logger.info("Calculation finished!")
+        logger.info("\033[1;31;47mNo certain matches has been found. Trying to collect at the most probable position.\033[0m")
+        potentialMatches[0, 6] = True
+
     logger.info("Case# | Xtal1 | Xtal2 |  Score  | Confidence | Y/N | Collect? | Resolution | Beam size |        Center command  ")
     for item in potentialMatches:
     	logger.info("{0:3.0f}   | {1:3.0f}   | {2:3.0f}   |  {3:4.2f}   |  {4:>7s}   |  {5}  |    {6}     |    {7:.2f}    |     {8:3.0f}   |  {9} ".format(item[0], item[1], item[2], item[3],
@@ -281,7 +288,6 @@ def analyseDoubleMeshscan(path):
 #analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20220203/PROCESSED_DATA/Sample-4-1-02/MeshScan_01/Workflow_20220203-135018/DozorM2_mesh-local-user_1_01')
 #analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20220608/PROCESSED_DATA/test/test-test/MeshScan_02/Workflow_20220608-115431/DozorM2_mesh-test-test_1_01')
 
-#analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20231207/PROCESSED_DATA/Sample-2-2-02/run_01_MeshScan/Workflow_20231207-143206/DozorM2_mesh-opid231_1_2_01')
 
 
 #potentialMatches = numpy.loadtxt('/data/id23eh1/inhouse/opid231/20220203/PROCESSED_DATA/Sample-4-1-02/MeshScan_01/Workflow_20220203-135018/DozorM2_mesh-local-user_1_01/test.dat',
@@ -301,7 +307,8 @@ def analyseDoubleMeshscan(path):
 #analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20230926/PROCESSED_DATA/br/br-br4/run_01_MeshScan/Workflow_20230926-195834/DozorM2_mesh-br-br4_1_2_01')
 
 
-
+#07122023
+#analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20231207/PROCESSED_DATA/Sample-2-2-02/run_01_MeshScan/Workflow_20231207-143206/DozorM2_mesh-opid231_1_2_01')
 
 
 

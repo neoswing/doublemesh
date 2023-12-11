@@ -8,6 +8,7 @@ By Igor Melnikov
 __version__ = 2.1
 'v.2.1 fixed minor bug'
 
+import time
 import numpy
 from scipy import ndimage
 from scipy.cluster import hierarchy
@@ -17,7 +18,7 @@ from matplotlib import pyplot as plt
 
 import logging
 logger = logging.getLogger("test")
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 for h in logger.handlers:
     h.close()
     logger.removeHandler(h)
@@ -132,7 +133,7 @@ def alignment_score(dr, RealCoords):
 
 def find_planes(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
     ''' Returns plane normale vector XYZ with interplane frequency as length and fourier peak height'''
-#    st = time.time()
+    st = time.time()
     RealCoords = numpy.zeros((numpy.shape(spots)[0], 3))
 
     x = (spots[:, 1] - BeamCenter[0]) * DetectorPixel
@@ -148,7 +149,6 @@ def find_planes(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
         logger.error('Not enough spots for proper analysis in some of the crystals')
         return [], RealCoords
     else:
-
         bining = 50
         phis = numpy.linspace(0, 3.14, bining)
         thetas = numpy.linspace(0, 3.14, bining)
@@ -159,13 +159,14 @@ def find_planes(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
         plt.imshow(Z, cmap='hot', interpolation='nearest', origin='lower', extent=[phis.min(), phis.max(), thetas.min(), thetas.max()])
         plt.colorbar()
         plt.show()
+        logger.debug('\033[1;35;47m')
         logger.debug('Peak areas: {0}'.format(numpy.where(Z>Z.mean()+10*Z.std())))
                 
         peaks = find_peaks2D(Z)
         logger.debug('Peaks: {0}'.format(peaks))
         bining = 50
         vectors = []
-#        print("Main part finished in {} s".format((time.time()-st)))
+        logger.debug("Coarse search finished in {:.1f} s\n\033[0m".format((time.time()-st)))
         for peak in peaks:
             maindirection = thetas[peak[0]], phis[peak[1]]
             logger.debug('Main direction unrefined: phi={0:.2f}, theta={1:.2f}'.format(maindirection[1], maindirection[0]))
@@ -234,37 +235,46 @@ def find_planes(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
 
 def check(RealCoords, plane_vector):
     freq = numpy.linalg.norm(plane_vector[:3])
-    if freq>300:
-        logger.info('Detected large cell parameter ({0:.2f}'.format(freq)+u'\u212B'+
-                    '): vector {0} with confidence score {1:.2f}'.format(plane_vector[:3], plane_vector[3]))
-        logger.info('No trust to this one')
+#    if freq>300:
+#        logger.info('Detected large cell parameter ({0:.2f}'.format(freq)+u'\u212B'+
+#                    '): vector {0} with confidence score {1:.2f}'.format(plane_vector[:3], plane_vector[3]))
+#        logger.info('No trust to this one')
     direction = plane_vector[:3]/freq
     proj_coords = direction_proj(direction, RealCoords)
     n_peak = int(freq*(proj_coords.max()-proj_coords.min())/numpy.pi)
-    n_peak = n_peak if n_peak>0 else 1
+    n_peak = n_peak if n_peak>2 else 2
     
     bins = int(max(0.04*proj_coords.size, 100, 4*n_peak))
     logger.debug('Number of bins: {}'.format(bins))
 
     dens = numpy.histogram(proj_coords, bins=bins)[0].astype(float)
+    corr = ndimage.gaussian_filter1d(dens, sigma=10)#0.001*proj_coords.size*bins)
+    plt.title('Spot density for direction {0:.1f} {1:.1f} {2:.1f}'.format(*list(plane_vector[:3]))+
+              ', coords size {0}, bins {1}'.format(proj_coords.size, bins))
     plt.plot(dens)
+    plt.plot(corr)
     plt.show()
-    dens -= ndimage.gaussian_filter1d(dens, sigma=0.05*proj_coords.size)
+    dens -= corr
     dens -= numpy.mean(dens)
     fourier = numpy.abs(numpy.fft.rfft(dens))
 
-    plt.plot(fourier)
+    logger.info('Search for peak in: {0}, corresponding to frequency {1:.1f}'.format(n_peak, freq)+u'\u212B')
+    logger.debug('Values of fourier around peak: {0:.1f} {1:.1f} {2:.1f} {3:.1f} {4:.1f}'.format(*list(fourier[n_peak-2:n_peak+3])))
+    refined_peak = numpy.argmax(fourier[n_peak-2:n_peak+3]) + n_peak - 2 if n_peak>3 else 3
+    logger.debug('Refined peak position: {}'.format(refined_peak))
+    
+    noise_regions = numpy.delete(numpy.arange(fourier.size), numpy.concatenate((numpy.arange(fourier.size)[::refined_peak],
+                                              numpy.arange(fourier.size)[::refined_peak-1],
+                                              numpy.arange(fourier.size)[::refined_peak+1])))[2:]
+    noise = fourier[noise_regions]
+    
+    plt.plot(numpy.arange(fourier.size), fourier)
+    plt.plot(noise_regions, noise, c='red')
     plt.show()
-
-    logger.info('Search for peak in: {0}, corresponding to frequency {1:.2f}'.format(n_peak, freq)+u'\u212B')
-    logger.debug(n_peak)
-    logger.debug(fourier[n_peak-1:n_peak+2])
-    refined_peak = numpy.argmax(fourier[n_peak-1:n_peak+2]) + n_peak - 1
-    noise = fourier[numpy.delete(numpy.arange(fourier.size), numpy.arange(fourier.size)[::refined_peak])]
 #    print(noise)
     r = (fourier[refined_peak] - noise.mean()) / (5*noise.std())
     logger.debug('I/5sig value: {:.2f}'.format(r))
-    logger.debug('Patterns match!\n') if r>=1.5 else logger.debug('! ! ! ! ! Patterns do not match\n')
+    logger.debug('\033[1;32;47mPatterns match!\033[0m\n') if r>=1.5 else logger.debug('\033[1;31;47m ! ! ! ! ! Patterns do not match\033[0m\n')
     return r.round(2)
 
 def crosscheck2patterns(spots1, spots2, angle_delta, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
