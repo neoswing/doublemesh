@@ -5,8 +5,8 @@ By Igor Melnikov
 04/08/2021
 """
 
-__version__ = 2.1
-'v.2.1 fixed minor bug'
+__version__ = 3.0
+'v.3.0 more accurate fourier peak analysis'
 
 import time
 import numpy
@@ -16,20 +16,24 @@ from scipy.spatial import distance
 from matplotlib import pyplot as plt
 
 
-import logging
-logger = logging.getLogger("test")
-logger.setLevel(logging.DEBUG)
-for h in logger.handlers:
-    h.close()
-    logger.removeHandler(h)
-    
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-ch.setFormatter(formatter)
-logger.addHandler(ch)
-logger.propagate = False
 
+try:
+    from bes.workflow_lib import workflow_logging
+    logger = workflow_logging.getLogger()
+except:
+    import logging
+    logger = logging.getLogger("test")
+    logger.setLevel(logging.DEBUG)
+    for h in logger.handlers:
+        h.close()
+        logger.removeHandler(h)
+        
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+    logger.propagate = False
 
 
 
@@ -37,20 +41,17 @@ float_formatter = "{:.2f}".format
 numpy.set_printoptions(formatter={'float_kind':float_formatter})
 
 class color:
-   PURPLE = '\033[95m'
-   CYAN = '\033[96m'
-   DARKCYAN = '\033[36m'
-   BLUE = '\033[94m'
-   GREEN = '\033[92m'
-   YELLOW = '\033[93m'
-   RED = '\033[91m'
-   BOLD = '\033[1m'
-   UNDERLINE = '\033[4m'
+   PURPLE = '\033[1;35;47m'
+   GREEN = '\033[1;32;47m'
+   RED = '\033[1;31;47m'
    END = '\033[0m'
 
 
 def sigmoid(x, a=4.39, x0=1.0):
     return 1/(1+numpy.exp(-a*(x-x0)))
+
+def sigmoid1(x):
+    return 1/(1+numpy.exp(-3*(x-1.5)))
 
 def Spherical_coords(xyz):
     ptsnew = numpy.zeros(xyz.shape)
@@ -159,14 +160,14 @@ def find_planes(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
         plt.imshow(Z, cmap='hot', interpolation='nearest', origin='lower', extent=[phis.min(), phis.max(), thetas.min(), thetas.max()])
         plt.colorbar()
         plt.show()
-        logger.debug('\033[1;35;47m')
-        logger.debug('Peak areas: {0}'.format(numpy.where(Z>Z.mean()+10*Z.std())))
+
+        logger.debug(color.PURPLE+'Peak areas: {0}'.format(numpy.where(Z>Z.mean()+10*Z.std())))
                 
         peaks = find_peaks2D(Z)
         logger.debug('Peaks: {0}'.format(peaks))
         bining = 50
         vectors = []
-        logger.debug("Coarse search finished in {:.1f} s\n\033[0m".format((time.time()-st)))
+        logger.debug("Coarse search finished in {:.1f} s\n".format((time.time()-st))+color.END)
         for peak in peaks:
             maindirection = thetas[peak[0]], phis[peak[1]]
             logger.debug('Main direction unrefined: phi={0:.2f}, theta={1:.2f}'.format(maindirection[1], maindirection[0]))
@@ -212,21 +213,39 @@ def find_planes(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
             
             bins = int(0.8*proj_coords.size)
             bins = bins if bins>=50 else 50
-            dens = numpy.histogram(proj_coords, bins=bins)[0].astype(float)
-            plt.plot(dens)
+            
+            h = numpy.histogram(proj_coords, bins=bins)
+            dens = h[0].astype(float)
+            corr = ndimage.gaussian_filter1d(dens, sigma=0.1*bins)
+            plt.title('Find: Spot density for direction {0:.1f} {1:.1f} {2:.1f}'.format(*list(maindirectionXYZ[:3]))+
+                      ', coords size {0}, bins {1}'.format(proj_coords.size, bins))
+            plt.plot(h[1][:-1]+(h[1][1]-h[1][0])/2.0, dens)
+            plt.plot(h[1][:-1]+(h[1][1]-h[1][0])/2.0, corr)
+            plt.xlabel(r'$\AA^{-1}$')
             plt.show()
-            dens -= ndimage.gaussian_filter1d(dens, sigma=0.05*proj_coords.size)
+            dens -= corr
             dens -= numpy.mean(dens)
             fourier = numpy.abs(numpy.fft.rfft(dens))
-            plt.plot(fourier)
-            plt.show()
-            
+
             peak = int(numpy.argmax(fourier))
-            w = numpy.pi*peak/(proj_coords.max()-proj_coords.min())
-            noise = fourier[numpy.delete(numpy.arange(fourier.size), numpy.arange(fourier.size)[::peak])]
+            w = numpy.pi*peak/(h[1][-1]-h[1][0])
+#            to_delete = numpy.concatenate([numpy.arange(fourier.size)[::peak+i] for i in range(-(fourier.size//100), (fourier.size//100)+1)])
+#            noise_regions = numpy.delete(numpy.arange(fourier.size), to_delete)
+            noise_regions = numpy.arange(fourier.size)[fourier<=numpy.median(fourier)]
+            noise_regions = numpy.arange(fourier.size)[fourier<=numpy.median(fourier)+noise_regions.std()]
+            noise = fourier[noise_regions]
+
+            plt.title('Find: Fourier components for direction {0:.1f} {1:.1f} {2:.1f}'.format(*list(w*maindirectionXYZ[:3]))+
+                      ', coords size {0}, bins {1}'.format(proj_coords.size, bins))
+            frequences = numpy.pi*numpy.arange(fourier.size)/(h[1][-1]-h[1][0])
+            plt.plot(frequences[frequences<1500], fourier[frequences<1500])
+            plt.plot(frequences[noise_regions][frequences[noise_regions]<1500], noise[frequences[noise_regions]<1500], c='red')
+            plt.xlabel(r'$\AA$')
+            plt.show()
+
             score = (fourier[peak] - noise.mean()) / (5*noise.std())
             
-            logger.debug('Score for direction: {:.2f}'.format(score))
+            logger.debug('Score (I/5*sig) for direction: {:.2f}'.format(score))
             if score>=0.3:#>=1:
                 vectors.append(numpy.hstack((w*maindirectionXYZ, score)))
             else:
@@ -244,37 +263,44 @@ def check(RealCoords, plane_vector):
     n_peak = int(freq*(proj_coords.max()-proj_coords.min())/numpy.pi)
     n_peak = n_peak if n_peak>2 else 2
     
-    bins = int(max(0.04*proj_coords.size, 100, 4*n_peak))
+    bins = int(max(0.1*proj_coords.size, 100, 4*n_peak))
     logger.debug('Number of bins: {}'.format(bins))
 
-    dens = numpy.histogram(proj_coords, bins=bins)[0].astype(float)
-    corr = ndimage.gaussian_filter1d(dens, sigma=10)#0.001*proj_coords.size*bins)
-    plt.title('Spot density for direction {0:.1f} {1:.1f} {2:.1f}'.format(*list(plane_vector[:3]))+
+    h = numpy.histogram(proj_coords, bins=bins)
+    dens = h[0].astype(float)
+    corr = ndimage.gaussian_filter1d(dens, sigma=0.1*bins)
+    plt.title('Check: Spot density for direction {0:.1f} {1:.1f} {2:.1f}'.format(*list(plane_vector[:3]))+
               ', coords size {0}, bins {1}'.format(proj_coords.size, bins))
-    plt.plot(dens)
-    plt.plot(corr)
+    plt.plot(h[1][:-1]+(h[1][1]-h[1][0])/2.0, dens)
+    plt.plot(h[1][:-1]+(h[1][1]-h[1][0])/2.0, corr)
+    plt.xlabel(r'$\AA^{-1}$')
     plt.show()
     dens -= corr
     dens -= numpy.mean(dens)
     fourier = numpy.abs(numpy.fft.rfft(dens))
 
-    logger.info('Search for peak in: {0}, corresponding to frequency {1:.1f}'.format(n_peak, freq)+u'\u212B')
-    logger.debug('Values of fourier around peak: {0:.1f} {1:.1f} {2:.1f} {3:.1f} {4:.1f}'.format(*list(fourier[n_peak-2:n_peak+3])))
-    refined_peak = numpy.argmax(fourier[n_peak-2:n_peak+3]) + n_peak - 2 if n_peak>3 else 3
-    logger.debug('Refined peak position: {}'.format(refined_peak))
+    logger.info('Search for peak around frequency {:.1f}'.format(freq)+u'\u212B')
+    peaksearch = numpy.array([n_peak+i for i in range(-(bins//100), (bins//100)+1)])
+    peaksearch = peaksearch[peaksearch>=0]
+    refined_peak = numpy.argmax(fourier[peaksearch]) + peaksearch[0]
+    logger.debug(('Values of fourier around peak: {'+':.1f} {'.join(numpy.arange(peaksearch.size).astype(str))+':.1f}').format(*list(fourier[peaksearch])))
+    logger.debug('Refined peak position: {:.1f}'.format(numpy.pi*refined_peak/(h[1][-1]-h[1][0]))+u'\u212B')
     
-    noise_regions = numpy.delete(numpy.arange(fourier.size), numpy.concatenate((numpy.arange(fourier.size)[::refined_peak],
-                                              numpy.arange(fourier.size)[::refined_peak-1],
-                                              numpy.arange(fourier.size)[::refined_peak+1])))[2:]
+    noise_regions = numpy.arange(fourier.size)[fourier<=numpy.median(fourier)]
+    noise_regions = numpy.arange(fourier.size)[fourier<=numpy.median(fourier)+noise_regions.std()]
     noise = fourier[noise_regions]
     
-    plt.plot(numpy.arange(fourier.size), fourier)
-    plt.plot(noise_regions, noise, c='red')
+    plt.title('Check: Fourier components for direction {0:.1f} {1:.1f} {2:.1f}'.format(*list(plane_vector[:3]))+
+              ', coords size {0}, bins {1}'.format(proj_coords.size, bins)) 
+    frequences = numpy.pi*numpy.arange(fourier.size)/(h[1][-1]-h[1][0])
+    plt.plot(frequences[frequences<1500], fourier[frequences<1500])
+    plt.plot(frequences[noise_regions][frequences[noise_regions]<1500], noise[frequences[noise_regions]<1500], c='red')
+    plt.xlabel(r'$\AA$')
     plt.show()
-#    print(noise)
+
     r = (fourier[refined_peak] - noise.mean()) / (5*noise.std())
     logger.debug('I/5sig value: {:.2f}'.format(r))
-    logger.debug('\033[1;32;47mPatterns match!\033[0m\n') if r>=1.5 else logger.debug('\033[1;31;47m ! ! ! ! ! Patterns do not match\033[0m\n')
+    logger.debug(color.GREEN+'Patterns match!'+color.END) if r>=1.5 else logger.debug(color.RED+' ! ! ! ! ! Patterns do not match'+color.END)
     return r.round(2)
 
 def crosscheck2patterns(spots1, spots2, angle_delta, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
@@ -311,19 +337,24 @@ def crosscheck2patterns(spots1, spots2, angle_delta, BeamCenter, Wavelength, Det
     
     matches = numpy.asarray(matches)
     conf = numpy.asarray(conf)
+    
+#    conf = sigmoid1(conf)
+    
+#    return numpy.multiply(matches, conf).mean()
+    
     return sigmoid(numpy.sum(matches*numpy.exp(conf))/numpy.exp(conf).sum())
-#    return numpy.sum(matches*numpy.exp(conf))/numpy.exp(conf).sum()
 
 
 
 
 
-BeamCenter = (1026.16, 1085.48)
-Wavelength = 0.96770
-DetectorDistance = 114.60
-DetectorPixel = 0.075
 
-angle = -5
+#BeamCenter = (1026.16, 1085.48)
+#Wavelength = 0.96770
+#DetectorDistance = 114.60
+#DetectorPixel = 0.075
+#
+#angle = -5
 
 
 #ar1 = numpy.loadtxt('/home/esrf/melnikov/spyder/test/LYS_dataset/00001.spot', skiprows=3)
