@@ -5,8 +5,9 @@ By Igor Melnikov
 04/08/2021
 """
 
-__version__ = 3.0
-'v.3.0 more accurate fourier peak analysis'
+__version__ = '3.1'
+'''v.3.0 more accurate fourier peak analysis'''
+'''v.3.1 fixed logging issues'''
 
 import time
 import numpy
@@ -147,7 +148,7 @@ def find_planes(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
 #    RealCoords[i, 4] = float(spots[i, 3]) / float(spots[i, 4])
 
     if len(numpy.atleast_1d(spots)) < 50:
-        logger.error('Not enough spots for proper analysis in some of the crystals')
+        logger.debug('Not enough spots for proper analysis in some of the crystals')
         return [], RealCoords
     else:
         bining = 50
@@ -249,15 +250,15 @@ def find_planes(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
             if score>=0.3:#>=1:
                 vectors.append(numpy.hstack((w*maindirectionXYZ, score)))
             else:
-                logger.info('Score is too low, aborting this direction: {:.2f}'.format(score))
+                logger.debug('Score is too low, aborting this direction: {:.2f}'.format(score))
         return vectors, RealCoords
 
 def check(RealCoords, plane_vector):
     freq = numpy.linalg.norm(plane_vector[:3])
 #    if freq>300:
-#        logger.info('Detected large cell parameter ({0:.2f}'.format(freq)+u'\u212B'+
+#        logger.debug('Detected large cell parameter ({0:.2f}'.format(freq)+u'\u212B'+
 #                    '): vector {0} with confidence score {1:.2f}'.format(plane_vector[:3], plane_vector[3]))
-#        logger.info('No trust to this one')
+#        logger.debug('No trust to this one')
     direction = plane_vector[:3]/freq
     proj_coords = direction_proj(direction, RealCoords)
     n_peak = int(freq*(proj_coords.max()-proj_coords.min())/numpy.pi)
@@ -279,7 +280,7 @@ def check(RealCoords, plane_vector):
     dens -= numpy.mean(dens)
     fourier = numpy.abs(numpy.fft.rfft(dens))
 
-    logger.info('Search for peak around frequency {:.1f}'.format(freq)+u'\u212B')
+    logger.debug('Search for peak around frequency {:.1f}'.format(freq)+u'\u212B')
     peaksearch = numpy.array([n_peak+i for i in range(-(bins//100), (bins//100)+1)])
     peaksearch = peaksearch[peaksearch>=0]
     refined_peak = numpy.argmax(fourier[peaksearch]) + peaksearch[0]
@@ -310,14 +311,14 @@ def crosscheck2patterns(spots1, spots2, angle_delta, BeamCenter, Wavelength, Det
                                   Wavelength=Wavelength,
                                   DetectorDistance=DetectorDistance,
                                   DetectorPixel=DetectorPixel)
-    [logger.info('Directions 1st pattern: {0}, confidence {1:.2f}'.format(i[:3], i[3])) for i in v1]
+    [logger.debug('Directions 1st pattern: {0}, confidence {1:.2f}'.format(i[:3], i[3])) for i in v1]
     
     v2, RealCoords2 = find_planes(spots2,
                                   BeamCenter=BeamCenter,
                                   Wavelength=Wavelength,
                                   DetectorDistance=DetectorDistance,
                                   DetectorPixel=DetectorPixel)
-    [logger.info('Directions 2nd pattern: {0}, confidence {1:.2f}'.format(i[:3], i[3])) for i in v2]
+    [logger.debug('Directions 2nd pattern: {0}, confidence {1:.2f}'.format(i[:3], i[3])) for i in v2]
 
     matches = []
     conf = []
@@ -359,7 +360,7 @@ def crosscheck2patterns(spots1, spots2, angle_delta, BeamCenter, Wavelength, Det
 
 #ar1 = numpy.loadtxt('/home/esrf/melnikov/spyder/test/LYS_dataset/00001.spot', skiprows=3)
 #ar1 = ar1[ar1[:, 3]>numpy.percentile(ar1[:, 3], 80)]
-#logger.info('Number of spots 1st file: {}'.format(ar1.shape[0]))
+#logger.debug('Number of spots 1st file: {}'.format(ar1.shape[0]))
 #
 #ar_ovlp = numpy.loadtxt('/home/esrf/melnikov/spyder/test/LYS_dataset/00901.spot', skiprows=3)
 #ar_ovlp = numpy.append(ar_ovlp, numpy.loadtxt('/home/esrf/melnikov/spyder/test/LYS_dataset/01500.spot', skiprows=3), axis=0)
@@ -560,7 +561,7 @@ def normale(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
         if score>=1:
             vectors.append(numpy.hstack((w*maindirectionXYZ, score)))
         else:
-            logger.info('Score is too low, aborting this direction: {:.2f}'.format(score))
+            logger.debug('Score is too low, aborting this direction: {:.2f}'.format(score))
         
     
     return vectors, RealCoords

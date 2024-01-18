@@ -6,15 +6,16 @@ Created on Wed Dec  8 11:31:42 2021
 @author: melnikov
 """
 
-__version__ = 1.8
+__version__ = '1.8.1'
 
 '''added output as first position in case no matches have been found'''
+'''added version notice'''
 
 import os
 #import sys
 import re
 import glob
-#import time
+import time
 import multiprocessing as mp
 #import matplotlib
 #matplotlib.use('Agg')
@@ -94,7 +95,9 @@ def analyseDoubleMeshscan(path):
         logger = logging.getLogger("test")
         logger.setLevel(logging.DEBUG)
 
-
+    start = time.time()
+    logger.info('doublemesh_lib, version: {}'.format(__version__))
+    logger.info('lattice_vector_search, version: {}'.format(lattice_vector_search.__version__))
     global Buffer
     initialCWD = os.getcwd()
     os.chdir(path)
@@ -213,6 +216,8 @@ def analyseDoubleMeshscan(path):
 
         matches = numpy.asarray(matches)
         conf = numpy.asarray(conf)
+#        conf = lattice_vector_search.sigmoid1(conf)
+#        line[3] = numpy.multiply(matches, conf).mean()
         line[3] = lattice_vector_search.sigmoid(numpy.sum(matches*numpy.exp(conf))/numpy.exp(conf).sum())
         line[4] = conf.mean()
         
@@ -273,12 +278,12 @@ def analyseDoubleMeshscan(path):
     
 #    collectPosition columns: 0_resolution 1_beam_size 2_sampx 3_sampy 4_phiy
     collectPositions = potentialMatches[potentialMatches[:, 6].astype(bool)][:, 7:]
-
+    logger.info('Elapsed: {:.2f}s'.format(time.time()-start))
     return collectPositions, potentialMatches
 
 
 
-#start = time.time()
+
 
 
 
@@ -287,7 +292,7 @@ def analyseDoubleMeshscan(path):
 #analyseDoubleMeshscan('./')
 #analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20220203/PROCESSED_DATA/Sample-4-1-02/MeshScan_01/Workflow_20220203-135018/DozorM2_mesh-local-user_1_01')
 #analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20220608/PROCESSED_DATA/test/test-test/MeshScan_02/Workflow_20220608-115431/DozorM2_mesh-test-test_1_01')
-
+analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20240117/PROCESSED_DATA/GORD/OLPVR/olpvr/olpvr-x/run_01_MeshScan/Workflow_20240117-164009/DozorM2_two_meshes')
 
 
 #potentialMatches = numpy.loadtxt('/data/id23eh1/inhouse/opid231/20220203/PROCESSED_DATA/Sample-4-1-02/MeshScan_01/Workflow_20220203-135018/DozorM2_mesh-local-user_1_01/test.dat',
@@ -297,7 +302,7 @@ def analyseDoubleMeshscan(path):
 #
 #print(x[0][x[1]>1])
 
-#logger.info('Elapsed: {:.2f}s'.format(time.time()-start))
+
 
 
 
@@ -311,6 +316,6 @@ def analyseDoubleMeshscan(path):
 #analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20231207/PROCESSED_DATA/Sample-2-2-02/run_01_MeshScan/Workflow_20231207-143206/DozorM2_mesh-opid231_1_2_01')
 
 
-
+#analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20231212/PROCESSED_DATA/Sample-3-2-04/run_04_MeshScan/Workflow_20231212-154107/DozorM2_two_meshes')
 
 
