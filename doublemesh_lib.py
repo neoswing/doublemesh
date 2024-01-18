@@ -17,8 +17,8 @@ import re
 import glob
 import time
 import multiprocessing as mp
-#import matplotlib
-#matplotlib.use('Agg')
+import matplotlib
+matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 import numpy
 try:
