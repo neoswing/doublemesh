@@ -17,10 +17,13 @@ __version__ = "3.1"
 """v.3.1 fixed logging issues"""
 
 
+DO_PLOT = True
+
 try:
     from bes.workflow_lib import workflow_logging
 
     logger = workflow_logging.getLogger()
+    DO_PLOT = False
 except Exception:
     import logging
 
@@ -113,12 +116,14 @@ def rotate_vector(vector, axis, angle):
 def find_peaks2D(array2D, onepeak=False):
     if onepeak:
         array2D = ndimage.gaussian_filter(array2D, sigma=2)
+        # if DO_PLOT:
         #        plt.imshow(array2D, cmap='hot', origin="lower")
         #        plt.show()
         return [numpy.unravel_index(numpy.argmax(array2D), array2D.shape)]
     else:
         peak_indices = []
         array2D -= ndimage.gaussian_filter(array2D, sigma=5)
+        # if DO_PLOT:
         #        plt.imshow(array2D, cmap='hot')
         #        plt.imshow(((array2D/(array2D.mean()+3*array2D.std()))>1.0), cmap='hot')
         #        plt.show()
@@ -174,15 +179,16 @@ def find_planes(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
         Z = numpy.zeros((bining, bining))
         for i, j in numpy.ndindex((bining, bining)):
             Z[i, j] = alignment_score((thetas[i], phis[j]), RealCoords)
-        plt.imshow(
-            Z,
-            cmap="hot",
-            interpolation="nearest",
-            origin="lower",
-            extent=[phis.min(), phis.max(), thetas.min(), thetas.max()],
-        )
-        plt.colorbar()
-        plt.show()
+        if DO_PLOT:
+            plt.imshow(
+                Z,
+                cmap="hot",
+                interpolation="nearest",
+                origin="lower",
+                extent=[phis.min(), phis.max(), thetas.min(), thetas.max()],
+            )
+            plt.colorbar()
+            plt.show()
 
         logger.debug(
             color.PURPLE
@@ -217,15 +223,16 @@ def find_planes(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
             Z = numpy.zeros((bining2, bining2))
             for i, j in numpy.ndindex((bining2, bining2)):
                 Z[i, j] = alignment_score((t[i], p[j]), RealCoords)
-            plt.imshow(
-                Z,
-                cmap="hot",
-                interpolation="nearest",
-                origin="lower",
-                extent=[p.min(), p.max(), t.min(), t.max()],
-            )
-            plt.colorbar()
-            plt.show()
+            if DO_PLOT:
+                plt.imshow(
+                    Z,
+                    cmap="hot",
+                    interpolation="nearest",
+                    origin="lower",
+                    extent=[p.min(), p.max(), t.min(), t.max()],
+                )
+                plt.colorbar()
+                plt.show()
             refine_peak = find_peaks2D(Z, onepeak=True)
             logger.debug("Refined peak: {}".format(refine_peak))
 
@@ -249,15 +256,16 @@ def find_planes(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
             Z = numpy.zeros((bining2, bining2))
             for i, j in numpy.ndindex((bining2, bining2)):
                 Z[i, j] = alignment_score((t[i], p[j]), RealCoords)
-            plt.imshow(
-                Z,
-                cmap="hot",
-                interpolation="nearest",
-                origin="lower",
-                extent=[p.min(), p.max(), t.min(), t.max()],
-            )
-            plt.colorbar()
-            plt.show()
+            if DO_PLOT:
+                plt.imshow(
+                    Z,
+                    cmap="hot",
+                    interpolation="nearest",
+                    origin="lower",
+                    extent=[p.min(), p.max(), t.min(), t.max()],
+                )
+                plt.colorbar()
+                plt.show()
             refine_peak = find_peaks2D(Z, onepeak=True)
             logger.debug("Refined peak: {}".format(refine_peak))
 
@@ -280,16 +288,17 @@ def find_planes(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
             h = numpy.histogram(proj_coords, bins=bins)
             dens = h[0].astype(float)
             corr = ndimage.gaussian_filter1d(dens, sigma=0.1 * bins)
-            plt.title(
-                "Find: Spot density for direction {0:.1f} {1:.1f} {2:.1f}".format(
-                    *list(maindirectionXYZ[:3])
+            if DO_PLOT:
+                plt.title(
+                    "Find: Spot density for direction {0:.1f} {1:.1f} {2:.1f}".format(
+                        *list(maindirectionXYZ[:3])
+                    )
+                    + ", coords size {0}, bins {1}".format(proj_coords.size, bins)
                 )
-                + ", coords size {0}, bins {1}".format(proj_coords.size, bins)
-            )
-            plt.plot(h[1][:-1] + (h[1][1] - h[1][0]) / 2.0, dens)
-            plt.plot(h[1][:-1] + (h[1][1] - h[1][0]) / 2.0, corr)
-            plt.xlabel(r"$\AA^{-1}$")
-            plt.show()
+                plt.plot(h[1][:-1] + (h[1][1] - h[1][0]) / 2.0, dens)
+                plt.plot(h[1][:-1] + (h[1][1] - h[1][0]) / 2.0, corr)
+                plt.xlabel(r"$\AA^{-1}$")
+                plt.show()
             dens -= corr
             dens -= numpy.mean(dens)
             fourier = numpy.abs(numpy.fft.rfft(dens))
@@ -311,14 +320,15 @@ def find_planes(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
                 + ", coords size {0}, bins {1}".format(proj_coords.size, bins)
             )
             frequences = numpy.pi * numpy.arange(fourier.size) / (h[1][-1] - h[1][0])
-            plt.plot(frequences[frequences < 1500], fourier[frequences < 1500])
-            plt.plot(
-                frequences[noise_regions][frequences[noise_regions] < 1500],
-                noise[frequences[noise_regions] < 1500],
-                c="red",
-            )
-            plt.xlabel(r"$\AA$")
-            plt.show()
+            if DO_PLOT:
+                plt.plot(frequences[frequences < 1500], fourier[frequences < 1500])
+                plt.plot(
+                    frequences[noise_regions][frequences[noise_regions] < 1500],
+                    noise[frequences[noise_regions] < 1500],
+                    c="red",
+                )
+                plt.xlabel(r"$\AA$")
+                plt.show()
 
             score = (fourier[peak] - noise.mean()) / (5 * noise.std())
 
@@ -349,16 +359,17 @@ def check(RealCoords, plane_vector):
     h = numpy.histogram(proj_coords, bins=bins)
     dens = h[0].astype(float)
     corr = ndimage.gaussian_filter1d(dens, sigma=0.1 * bins)
-    plt.title(
-        "Check: Spot density for direction {0:.1f} {1:.1f} {2:.1f}".format(
-            *list(plane_vector[:3])
+    if DO_PLOT:
+        plt.title(
+            "Check: Spot density for direction {0:.1f} {1:.1f} {2:.1f}".format(
+                *list(plane_vector[:3])
+            )
+            + ", coords size {0}, bins {1}".format(proj_coords.size, bins)
         )
-        + ", coords size {0}, bins {1}".format(proj_coords.size, bins)
-    )
-    plt.plot(h[1][:-1] + (h[1][1] - h[1][0]) / 2.0, dens)
-    plt.plot(h[1][:-1] + (h[1][1] - h[1][0]) / 2.0, corr)
-    plt.xlabel(r"$\AA^{-1}$")
-    plt.show()
+        plt.plot(h[1][:-1] + (h[1][1] - h[1][0]) / 2.0, dens)
+        plt.plot(h[1][:-1] + (h[1][1] - h[1][0]) / 2.0, corr)
+        plt.xlabel(r"$\AA^{-1}$")
+        plt.show()
     dens -= corr
     dens -= numpy.mean(dens)
     fourier = numpy.abs(numpy.fft.rfft(dens))
@@ -396,14 +407,15 @@ def check(RealCoords, plane_vector):
         + ", coords size {0}, bins {1}".format(proj_coords.size, bins)
     )
     frequences = numpy.pi * numpy.arange(fourier.size) / (h[1][-1] - h[1][0])
-    plt.plot(frequences[frequences < 1500], fourier[frequences < 1500])
-    plt.plot(
-        frequences[noise_regions][frequences[noise_regions] < 1500],
-        noise[frequences[noise_regions] < 1500],
-        c="red",
-    )
-    plt.xlabel(r"$\AA$")
-    plt.show()
+    if DO_PLOT:
+        plt.plot(frequences[frequences < 1500], fourier[frequences < 1500])
+        plt.plot(
+            frequences[noise_regions][frequences[noise_regions] < 1500],
+            noise[frequences[noise_regions] < 1500],
+            c="red",
+        )
+        plt.xlabel(r"$\AA$")
+        plt.show()
 
     r = (fourier[refined_peak] - noise.mean()) / (5 * noise.std())
     logger.debug("I/5sig value: {:.2f}".format(r))
@@ -490,9 +502,10 @@ def crosscheck2patterns(
 # ar_ovlp = ar_ovlp[ar_ovlp[:, 3]>numpy.percentile(ar_ovlp[:, 3], 0)]
 # print(ar_ovlp.shape)
 #
-# plt.scatter(ar1[:, 1], ar1[:, 2], c='red', marker='+')
-# plt.scatter(ar_ovlp[:, 1], ar_ovlp[:, 2], c='blue', marker='x')
-# plt.show()
+# if DO_PLOT:
+#   plt.scatter(ar1[:, 1], ar1[:, 2], c='red', marker='+')
+#   plt.scatter(ar_ovlp[:, 1], ar_ovlp[:, 2], c='blue', marker='x')
+#   plt.show()
 
 # test = find_planes(ar_ovlp, BeamCenter, Wavelength, DetectorDistance, DetectorPixel)
 # print(test)
@@ -542,6 +555,7 @@ def normale(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
 
     normales = normales.reshape((3, 2 * bining**3)).T
     spherical = numpy.copy(normales)
+    # if DO_PLOT:
     #    plt.plot(normales[:, 1])
     #    plt.show()
 
@@ -563,21 +577,24 @@ def normale(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
     #    print(distance.squareform(clusters))
     #    print(spherical[:, :][points])
 
-    plt.imshow(distance.squareform(clusters), cmap="hot")
-    plt.colorbar()
-    plt.show()
+    if DO_PLOT:
+        plt.imshow(distance.squareform(clusters), cmap="hot")
+        plt.colorbar()
+        plt.show()
 
     Z = hierarchy.linkage(clusters, method="single", metric="euclidean")
 
     hierarchy.dendrogram(Z, color_threshold=0.5)
 
     F = hierarchy.fcluster(Z, t=0.2, criterion="distance")
-    plt.show()
-    #    print(F)
+    # if DO_PLOT:
+    #   plt.show()
+    #   print(F)
 
-    plt.plot(cost)
-    plt.scatter(points, cost[points], marker="o", c="red")
-    plt.show()
+    if DO_PLOT:
+        plt.plot(cost)
+        plt.scatter(points, cost[points], marker="o", c="red")
+        plt.show()
 
     #    print("{0}Main part finished in {1:.2f} s{2}".format(color.BOLD, (time.time()-st), color.END))
 
@@ -600,6 +617,7 @@ def normale(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
         #
         #        cost = numpy.sum(numpy.abs(NCT - NCT_Z), axis=0)
         #        cost -= numpy.convolve(cost, numpy.ones(c), 'same')/c
+        # if DO_PLOT:
         #        plt.plot(cost)
         # #       plt.scatter(points, cost[points], marker='o', c='red')
         #        plt.show()
@@ -624,15 +642,16 @@ def normale(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
         Z = numpy.zeros((bining, bining))
         for i, j in numpy.ndindex((bining, bining)):
             Z[i, j] = alignment_score((t[i], p[j]), RealCoords)
-        plt.imshow(
-            Z,
-            cmap="hot",
-            interpolation="nearest",
-            origin="lower",
-            extent=[p.min(), p.max(), t.min(), t.max()],
-        )
-        plt.colorbar()
-        plt.show()
+        if DO_PLOT:
+            plt.imshow(
+                Z,
+                cmap="hot",
+                interpolation="nearest",
+                origin="lower",
+                extent=[p.min(), p.max(), t.min(), t.max()],
+            )
+            plt.colorbar()
+            plt.show()
         refine_peak = find_peaks2D(Z, onepeak=True)
         logger.debug("Refined peak: {}".format(refine_peak))
         #        print(Z[refine_peak[0]])
@@ -653,15 +672,16 @@ def normale(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
         Z = numpy.zeros((bining, bining))
         for i, j in numpy.ndindex((bining, bining)):
             Z[i, j] = alignment_score((t[i], p[j]), RealCoords)
-        plt.imshow(
-            Z,
-            cmap="hot",
-            interpolation="nearest",
-            origin="lower",
-            extent=[p.min(), p.max(), t.min(), t.max()],
-        )
-        plt.colorbar()
-        plt.show()
+        if DO_PLOT:
+            plt.imshow(
+                Z,
+                cmap="hot",
+                interpolation="nearest",
+                origin="lower",
+                extent=[p.min(), p.max(), t.min(), t.max()],
+            )
+            plt.colorbar()
+            plt.show()
         refine_peak = find_peaks2D(Z, onepeak=True)
         logger.debug("Refined peak: {}".format(refine_peak))
         #        print(Z[refine_peak[0]])
@@ -681,15 +701,16 @@ def normale(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
         Z = numpy.zeros((bining, bining))
         for i, j in numpy.ndindex((bining, bining)):
             Z[i, j] = alignment_score((t[i], p[j]), RealCoords)
-        plt.imshow(
-            Z,
-            cmap="hot",
-            interpolation="nearest",
-            origin="lower",
-            extent=[p.min(), p.max(), t.min(), t.max()],
-        )
-        plt.colorbar()
-        plt.show()
+        if DO_PLOT:
+            plt.imshow(
+                Z,
+                cmap="hot",
+                interpolation="nearest",
+                origin="lower",
+                extent=[p.min(), p.max(), t.min(), t.max()],
+            )
+            plt.colorbar()
+            plt.show()
         refine_peak = find_peaks2D(Z, onepeak=True)
         logger.debug("Refined peak: {}".format(refine_peak))
         #        print(Z[refine_peak[0]])
@@ -709,13 +730,15 @@ def normale(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
         bins = int(0.8 * proj_coords.size)
         bins = bins if bins >= 50 else 50
         dens = numpy.histogram(proj_coords, bins=bins)[0].astype(float)
-        plt.plot(dens)
-        plt.show()
+        if DO_PLOT:
+            plt.plot(dens)
+            plt.show()
         dens -= ndimage.gaussian_filter1d(dens, sigma=0.05 * proj_coords.size)
         dens -= numpy.mean(dens)
         fourier = numpy.abs(numpy.fft.rfft(dens))
-        plt.plot(fourier)
-        plt.show()
+        if DO_PLOT:
+            plt.plot(fourier)
+            plt.show()
 
         peak = int(numpy.argmax(fourier))
         w = numpy.pi * peak / (proj_coords.max() - proj_coords.min())
