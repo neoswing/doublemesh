@@ -20,6 +20,12 @@ try:
 except ModuleNotFoundError:
     from bes.workflow_lib import lattice_vector_search
 
+try:
+    import billiard as mp
+except ModuleNotFoundError:
+    import multiprocessing as mp
+
+
 matplotlib.use("Agg")
 from matplotlib import pyplot as plt  # Noqa E402
 
@@ -165,11 +171,11 @@ def analyseDoubleMeshscan(path):
         (potentialMatches, numpy.zeros((potentialMatches.shape[0], 2)))
     )
 
-    manager = billiard.Manager()
+    manager = mp.Manager()
     Buffer = manager.dict()
-    nCPU = billiard.cpu_count()
+    nCPU = mp.cpu_count()
     logger.info("CPU count: {}".format(nCPU))
-    queue = billiard.Queue()
+    queue = mp.Queue()
 
     i = 0
     for spots in crystals_mesh1:
@@ -183,7 +189,7 @@ def analyseDoubleMeshscan(path):
 
     workers = []
     for item in range(nCPU):
-        worker = billiard.Process(
+        worker = mp.Process(
             target=findPlanes_MP,
             args=(
                 queue,
@@ -213,7 +219,7 @@ def analyseDoubleMeshscan(path):
 
     workers = []
     for item in range(nCPU):
-        worker = billiard.Process(
+        worker = mp.Process(
             target=findPlanes_MP,
             args=(
                 queue,
