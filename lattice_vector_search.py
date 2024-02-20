@@ -12,9 +12,10 @@ from scipy.cluster import hierarchy
 from scipy.spatial import distance
 from matplotlib import pyplot as plt
 
-__version__ = "3.1"
+__version__ = "3.2"
 """v.3.0 more accurate fourier peak analysis"""
 """v.3.1 fixed logging issues"""
+"""v.3. DO_PLOT=False within worflows"""
 
 
 DO_PLOT = True
@@ -485,39 +486,7 @@ def crosscheck2patterns(
     return sigmoid(numpy.sum(matches * numpy.exp(conf)) / numpy.exp(conf).sum())
 
 
-# BeamCenter = (1026.16, 1085.48)
-# Wavelength = 0.96770
-# DetectorDistance = 114.60
-# DetectorPixel = 0.075
-#
-# angle = -5
 
-
-# ar1 = numpy.loadtxt('/home/esrf/melnikov/spyder/test/LYS_dataset/00001.spot', skiprows=3)
-# ar1 = ar1[ar1[:, 3]>numpy.percentile(ar1[:, 3], 80)]
-# logger.debug('Number of spots 1st file: {}'.format(ar1.shape[0]))
-#
-# ar_ovlp = numpy.loadtxt('/home/esrf/melnikov/spyder/test/LYS_dataset/00901.spot', skiprows=3)
-# ar_ovlp = numpy.append(ar_ovlp, numpy.loadtxt('/home/esrf/melnikov/spyder/test/LYS_dataset/01500.spot', skiprows=3), axis=0)
-# ar_ovlp = ar_ovlp[ar_ovlp[:, 3]>numpy.percentile(ar_ovlp[:, 3], 0)]
-# print(ar_ovlp.shape)
-#
-# if DO_PLOT:
-#   plt.scatter(ar1[:, 1], ar1[:, 2], c='red', marker='+')
-#   plt.scatter(ar_ovlp[:, 1], ar_ovlp[:, 2], c='blue', marker='x')
-#   plt.show()
-
-# test = find_planes(ar_ovlp, BeamCenter, Wavelength, DetectorDistance, DetectorPixel)
-# print(test)
-
-
-def projection_reduced_sum(coordinates, normale):
-    product = numpy.dot(coordinates, normale)
-    z_product = numpy.round(numpy.copy(product))
-    #    print(z_product)
-    delta = numpy.sum(numpy.abs(product - z_product))
-
-    return delta
 
 
 def sphToXYZ(spherical):
@@ -758,29 +727,3 @@ def normale(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
     return vectors, RealCoords
 
 
-# import matplotlib
-# matplotlib.use("Agg")
-
-# start = time.time()
-#
-#
-# import time
-# spots = numpy.loadtxt('/home/esrf/melnikov/spyder/test/LYS_dataset/00001.spot', skiprows=3)
-# spots2 = numpy.loadtxt('/home/esrf/melnikov/spyder/test/LYS_dataset/00901.spot', skiprows=3)
-# #angle_increment = -0.05
-#
-#
-#
-# #vectors1 = normale(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel)[0]
-# #vectors2 = find_planes(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel)[0]
-#
-# angle_delta = -0.25*3.14159
-# l = []
-# X = crosscheck2patterns(spots, spots2, angle_delta, BeamCenter, Wavelength, DetectorDistance, DetectorPixel)
-#
-# print("{:.2f}".format(X))
-#
-#
-# plt.close()
-# finish = time.time()
-# print('Elapsed: {:.2f} s'.format((finish-start)))

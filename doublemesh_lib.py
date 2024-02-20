@@ -11,7 +11,6 @@ import re
 import glob
 import time
 import numpy
-import billiard
 import warnings
 import matplotlib
 
@@ -30,10 +29,11 @@ matplotlib.use("Agg")
 from matplotlib import pyplot as plt  # Noqa E402
 
 
-__version__ = "1.8.1"
+__version__ = "1.8.2"
 
 """added output as first position in case no matches have been found"""
 """added version notice"""
+"""small bug fixes"""
 
 warnings.filterwarnings("ignore")
 
@@ -307,10 +307,8 @@ def analyseDoubleMeshscan(path):
 
         verified = verified[verified[:, 5].astype(bool)]
         if verified.size > 0:
-            thrsh = numpy.percentile(verified[:, 3], 99)
-            candidates = verified[verified[:, 3] >= thrsh]
+            candidates = verified[verified[:, 3]>=verified[:, 3].max()-0.05]
             x = verified[numpy.argmax(candidates[:, 4]), 0].astype(int) - 1
-
         else:
             break
         potentialMatches[x, 6] = 1
@@ -334,7 +332,7 @@ def analyseDoubleMeshscan(path):
     # potentialMatches: Case Xtal1 Xtal2 MatchScore Confidence Y/N Collect? Resolution BeamSize SampX SampY PhiY
 
     # If no certain positions have been identified:
-    if not numpy.all(potentialMatches[:, 6]):
+    if numpy.all(potentialMatches[:, 5]==False):
         logger.info(
             "\033[1;31;47mNo certain matches has been found. Trying to collect at the most probable position.\033[0m"
         )
@@ -370,32 +368,3 @@ def analyseDoubleMeshscan(path):
     collectPositions = potentialMatches[potentialMatches[:, 6].astype(bool)][:, 7:]
     logger.info("Elapsed: {:.2f}s".format(time.time() - start))
     return collectPositions, potentialMatches
-
-
-# matplotlib.use('Agg')
-
-# analyseDoubleMeshscan('./')
-# analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20220203/PROCESSED_DATA/Sample-4-1-02/MeshScan_01/Workflow_20220203-135018/DozorM2_mesh-local-user_1_01')
-# analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20220608/PROCESSED_DATA/test/test-test/MeshScan_02/Workflow_20220608-115431/DozorM2_mesh-test-test_1_01')
-# analyseDoubleMeshscan(
-#     "/data/id23eh1/inhouse/opid231/20240117/PROCESSED_DATA/GORD/OLPVR/olpvr/olpvr-x/run_01_MeshScan/Workflow_20240117-164009/DozorM2_two_meshes"
-# )
-
-
-# potentialMatches = numpy.loadtxt('/data/id23eh1/inhouse/opid231/20220203/PROCESSED_DATA/Sample-4-1-02/MeshScan_01/Workflow_20220203-135018/DozorM2_mesh-local-user_1_01/test.dat',
-#                                 skiprows=5)[:, [0,2,3]]
-# print(potentialMatches[potentialMatches[:, 2]>2])
-# x = numpy.unique(potentialMatches[:, 1], return_counts=True)
-#
-# print(x[0][x[1]>1])
-
-
-# 30092023
-# analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20230926/PROCESSED_DATA/br/br-br4/run_01_MeshScan/Workflow_20230926-195834/DozorM2_mesh-br-br4_1_2_01')
-
-
-# 07122023
-# analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20231207/PROCESSED_DATA/Sample-2-2-02/run_01_MeshScan/Workflow_20231207-143206/DozorM2_mesh-opid231_1_2_01')
-
-
-# analyseDoubleMeshscan('/data/id23eh1/inhouse/opid231/20231212/PROCESSED_DATA/Sample-3-2-04/run_04_MeshScan/Workflow_20231212-154107/DozorM2_two_meshes')
