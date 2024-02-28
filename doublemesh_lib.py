@@ -29,7 +29,9 @@ matplotlib.use("Agg")
 from matplotlib import pyplot as plt  # Noqa E402
 
 
-__version__ = "1.8.2"
+__version__ = "1.9"
+
+'''added crystal pair ranking by dozor score half-sum'''
 
 """added output as first position in case no matches have been found"""
 """added version notice"""
@@ -164,9 +166,9 @@ def analyseDoubleMeshscan(path):
     angle_delta = angle_delta * 3.14 / 180.0
 
     input_table = numpy.loadtxt("coordinat_list.dat", skiprows=0, ndmin=2)
-
+    
     #    potentialMatches = numpy.loadtxt('dozorm_pair.dat')
-    potentialMatches = input_table[:, [0, 1, 2]]
+    potentialMatches = input_table[:, [0, 1, 2, 3]]
     potentialMatches = numpy.hstack(
         (potentialMatches, numpy.zeros((potentialMatches.shape[0], 2)))
     )
@@ -284,16 +286,16 @@ def analyseDoubleMeshscan(path):
         matches = numpy.asarray(matches)
         conf = numpy.asarray(conf)
         #        conf = lattice_vector_search.sigmoid1(conf)
-        #        line[3] = numpy.multiply(matches, conf).mean()
-        line[3] = lattice_vector_search.sigmoid(
+        #        line[4] = numpy.multiply(matches, conf).mean()
+        line[4] = lattice_vector_search.sigmoid(
             numpy.sum(matches * numpy.exp(conf)) / numpy.exp(conf).sum()
         )
-        line[4] = conf.mean()
+        line[5] = conf.mean()
 
     potentialMatches = numpy.hstack(
         (
             potentialMatches,
-            (potentialMatches[:, 3] > 0.5).reshape(potentialMatches.shape[0], 1),
+            (potentialMatches[:, 4] > 0.5).reshape(potentialMatches.shape[0], 1),
         )
     )
 
@@ -305,13 +307,13 @@ def analyseDoubleMeshscan(path):
     for cycle in range(1000):
         verified = numpy.delete(potentialMatches, treated, axis=0)
 
-        verified = verified[verified[:, 5].astype(bool)]
+        verified = verified[verified[:, 6].astype(bool)]
         if verified.size > 0:
-            candidates = verified[verified[:, 3]>=verified[:, 3].max()-0.05]
-            x = verified[numpy.argmax(candidates[:, 4]), 0].astype(int) - 1
+            candidates = verified[verified[:, 4]>=verified[:, 4].max()-0.05]
+            x = verified[numpy.argmax(candidates[:, 3]), 0].astype(int) - 1
         else:
             break
-        potentialMatches[x, 6] = 1
+        potentialMatches[x, 7] = 1
 
         cr1 = potentialMatches[x, 1]
         cr2 = potentialMatches[x, 2]
@@ -327,44 +329,46 @@ def analyseDoubleMeshscan(path):
 
     # adding aperture
     potentialMatches = numpy.hstack((potentialMatches, input_table[:, [4, 5, 6, 7, 8]]))
-    #    commands = ['mv(sampx, {0:.4f}, sampy, {1:.4f}, phiy, {2:.4f})'.format(item[8], item[9], item[10]) for item in potentialMatches]
+    #    commands = ['mv(sampx, {0:.4f}, sampy, {1:.4f}, phiy, {2:.4f})'.format(item[9], item[10], item[11]) for item in potentialMatches]
     logger.info("Calculation finished!")
-    # potentialMatches: Case Xtal1 Xtal2 MatchScore Confidence Y/N Collect? Resolution BeamSize SampX SampY PhiY
+    # potentialMatches: Case Xtal1 Xtal2 AvgDozorScore MatchScore Confidence Y/N Collect? Resolution BeamSize SampX SampY PhiY
 
     # If no certain positions have been identified:
-    if numpy.all(potentialMatches[:, 5]==False):
+    if numpy.all(potentialMatches[:, 6]==False):
         logger.info(
             "\033[1;31;47mNo certain matches has been found. Trying to collect at the most probable position.\033[0m"
         )
-        potentialMatches[0, 6] = True
+        potentialMatches[0, 7] = True
+
 
     logger.info(
-        "Case# | Xtal1 | Xtal2 |  Score  | Confidence | Y/N | Collect? | Resolution | Beam size |        Center command  "
+        "Case# | Xtal1 | Xtal2 | DozorScore | MatchPb | Confidence | Y/N | Collect? | Resolution | Beam size |        Center command  "
     )
     for item in potentialMatches:
         logger.info(
-            "{0:3.0f}   | {1:3.0f}   | {2:3.0f}   |  {3:4.2f}   |  {4:>7s}   |  {5}  |    {6}     |    {7:.2f}    |     {8:3.0f}   |  {9} ".format(
+            "{0:3.0f}   | {1:3.0f}   | {2:3.0f}   |  {3:>7s}   |  {4:1.2f}   |  {5:>7s}   |  {6}  |    {7}     |    {8:.2f}    |     {9:3.0f}   |  {10} ".format(
                 item[0],
                 item[1],
                 item[2],
-                item[3],
-                format(item[4], "4.2f"),
-                "Y" if item[5].astype(bool) else "N",
-                "Y" if item[6].astype(bool) else " ",
-                item[7],
+                format(item[3], "4.2f"),
+                item[4],
+                format(item[5], "4.2f"),
+                "Y" if item[6].astype(bool) else "N",
+                "Y" if item[7].astype(bool) else " ",
                 item[8],
+                item[9],
                 "mv(sampx, {0:.4f}, sampy, {1:.4f}, phiy, {2:.4f})".format(
-                    item[9], item[10], item[11]
+                    item[10], item[11], item[12]
                 ),
             )
         )
 
-    #    numpy.savetxt('dozorm_pair_final.dat', potentialMatches, fmt='%d %d %d %.2f %3.2f %d %d %1.4f %3d %1.4f %1.4f %1.4f')
+    #    numpy.savetxt('dozorm_pair_final.dat', potentialMatches, fmt='%d %d %d %3.2f %.2f %3.2f %d %d %1.4f %3d %1.4f %1.4f %1.4f')
     plt.close()
 
     os.chdir(initialCWD)
 
     #    collectPosition columns: 0_resolution 1_beam_size 2_sampx 3_sampy 4_phiy
-    collectPositions = potentialMatches[potentialMatches[:, 6].astype(bool)][:, 7:]
+    collectPositions = potentialMatches[potentialMatches[:, 7].astype(bool)][:, 8:]
     logger.info("Elapsed: {:.2f}s".format(time.time() - start))
     return collectPositions, potentialMatches
