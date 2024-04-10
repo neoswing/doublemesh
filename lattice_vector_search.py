@@ -8,14 +8,13 @@ By Igor Melnikov
 import time
 import numpy
 from scipy import ndimage
-from scipy.cluster import hierarchy
-from scipy.spatial import distance
 from matplotlib import pyplot as plt
 
-__version__ = "3.2"
+__version__ = "3.3"
 """v.3.0 more accurate fourier peak analysis"""
 """v.3.1 fixed logging issues"""
-"""v.3. DO_PLOT=False within worflows"""
+"""v.3.2 DO_PLOT=False within workflows"""
+"""v.3.3 some cleaning; added refinement function for plane vector"""
 
 
 DO_PLOT = True
@@ -59,28 +58,22 @@ def sigmoid(x, a=4.39, x0=1.0):
     return 1 / (1 + numpy.exp(-a * (x - x0)))
 
 
-def sigmoid1(x):
-    return 1 / (1 + numpy.exp(-3 * (x - 1.5)))
-
-
-def Spherical_coords(xyz):
-    ptsnew = numpy.zeros(xyz.shape)
-    xy = xyz[:, 0] ** 2 + xyz[:, 1] ** 2
-    ptsnew[:, 0] = numpy.sqrt(xy + xyz[:, 2] ** 2)
-    ptsnew[:, 1] = numpy.arctan2(
-        numpy.sqrt(xy), xyz[:, 2]
-    )  # for elevation angle defined from Z-axis down
-    # ptsnew[:,4] = numpy.arctan2(xyz[:,2], numpy.sqrt(xy)) # for elevation angle defined from XY-plane up
-    ptsnew[:, 2] = numpy.arctan2(xyz[:, 1], xyz[:, 0])
-    return ptsnew
-
-
-def backToXYZ(Sphcoords):
-    xyz = numpy.zeros(Sphcoords.shape)
-    xyz[2] = Sphcoords[0] * numpy.cos(Sphcoords[1])
-    xyz[0] = Sphcoords[0] * numpy.sin(Sphcoords[1]) * numpy.cos(Sphcoords[2])
-    xyz[1] = Sphcoords[0] * numpy.sin(Sphcoords[1]) * numpy.sin(Sphcoords[2])
+def sphericalToXYZ(spherical):
+    xyz = numpy.zeros(spherical.shape)
+    xyz[2] = spherical[0] * numpy.cos(spherical[1])
+    xyz[0] = spherical[0] * numpy.sin(spherical[1]) * numpy.cos(spherical[2])
+    xyz[1] = spherical[0] * numpy.sin(spherical[1]) * numpy.sin(spherical[2])
     return xyz
+
+
+def xyzToSpherical(xyz):
+    ptsnew = numpy.zeros(xyz.shape)
+    xy = xyz[0] ** 2 + xyz[1] ** 2
+    ptsnew[0] = numpy.sqrt(xy + xyz[2] ** 2)
+    ptsnew[1] = numpy.arctan2(numpy.sqrt(xy), xyz[2]) # for elevation angle defined from Z-axis down
+    # ptsnew[4] = numpy.arctan2(xyz[2], numpy.sqrt(xy)) # for elevation angle defined from XY-plane up
+    ptsnew[2] = numpy.arctan2(xyz[1], xyz[0])
+    return ptsnew
 
 
 def density(x, sigma, points_coords):
@@ -88,7 +81,7 @@ def density(x, sigma, points_coords):
     return numpy.sum(numpy.exp(-(p**2) / (2 * sigma**2)), axis=0)
 
 
-def direction_proj(newaxR, RealCoords):
+def direction_proj(RealCoords, newaxR):
     return numpy.sum(numpy.multiply(newaxR, RealCoords), axis=1)
 
 
@@ -117,17 +110,17 @@ def rotate_vector(vector, axis, angle):
 def find_peaks2D(array2D, onepeak=False):
     if onepeak:
         array2D = ndimage.gaussian_filter(array2D, sigma=2)
-        # if DO_PLOT:
-        #        plt.imshow(array2D, cmap='hot', origin="lower")
-        #        plt.show()
+#        if DO_PLOT:
+#            plt.imshow(array2D, cmap='hot', origin="lower")
+#            plt.show()
         return [numpy.unravel_index(numpy.argmax(array2D), array2D.shape)]
     else:
         peak_indices = []
         array2D -= ndimage.gaussian_filter(array2D, sigma=5)
-        # if DO_PLOT:
-        #        plt.imshow(array2D, cmap='hot')
-        #        plt.imshow(((array2D/(array2D.mean()+3*array2D.std()))>1.0), cmap='hot')
-        #        plt.show()
+        if DO_PLOT:
+            plt.imshow(array2D, cmap='hot')
+            plt.imshow(((array2D/(array2D.mean()+3*array2D.std()))>1.0), cmap='hot')
+            plt.show()
         zones = ndimage.measurements.label(
             (array2D > array2D.mean() + 3 * array2D.std()), structure=numpy.ones((3, 3))
         )
@@ -141,11 +134,8 @@ def find_peaks2D(array2D, onepeak=False):
         return peak_indices
 
 
-# def refine_peak(phi_theta, RealCoords)
-
-
 def alignment_score(dr, RealCoords):
-    dr = backToXYZ(numpy.array([1, dr[0], dr[1]]))
+    dr = sphericalToXYZ(numpy.array([1, dr[0], dr[1]]))
     newdr_coords = numpy.dot(dr, RealCoords.T)
     histtt = numpy.histogram(newdr_coords, bins=100)[0]
     FT0 = histtt.sum()
@@ -155,19 +145,22 @@ def alignment_score(dr, RealCoords):
     return numpy.max(ft) / FT0
 
 
-def find_planes(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
+def find_planes(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel, spots_in3D=False):
     """Returns plane normale vector XYZ with interplane frequency as length and fourier peak height"""
     st = time.time()
-    RealCoords = numpy.zeros((numpy.shape(spots)[0], 3))
-
-    x = (spots[:, 1] - BeamCenter[0]) * DetectorPixel
-    y = (spots[:, 2] - BeamCenter[1]) * DetectorPixel
-    divider = Wavelength * numpy.sqrt(x**2 + y**2 + DetectorDistance**2)
-    RealCoords[:, 0] = x / divider
-    RealCoords[:, 1] = y / divider
-    RealCoords[:, 2] = (1 / Wavelength) - DetectorDistance / divider
-    #    RealCoords[i, 3] = spots[i, 0]
-    #    RealCoords[i, 4] = float(spots[i, 3]) / float(spots[i, 4])
+    if spots_in3D:
+        RealCoords = spots
+    else:
+        RealCoords = numpy.zeros((numpy.shape(spots)[0], 3))
+    
+        x = (spots[:, 1] - BeamCenter[0]) * DetectorPixel
+        y = (spots[:, 2] - BeamCenter[1]) * DetectorPixel
+        divider = Wavelength * numpy.sqrt(x**2 + y**2 + DetectorDistance**2)
+        RealCoords[:, 0] = x / divider
+        RealCoords[:, 1] = y / divider
+        RealCoords[:, 2] = (1 / Wavelength) - DetectorDistance / divider
+        #    RealCoords[i, 3] = spots[i, 0]
+        #    RealCoords[i, 4] = float(spots[i, 3]) / float(spots[i, 4])
 
     if len(numpy.atleast_1d(spots)) < 50:
         logger.debug("Not enough spots for proper analysis in some of the crystals")
@@ -278,10 +271,10 @@ def find_planes(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
                 )
             )
 
-            maindirectionXYZ = backToXYZ(
+            maindirectionXYZ = sphericalToXYZ(
                 numpy.array([1.0, maindirection[0], maindirection[1]])
             )
-            proj_coords = direction_proj(maindirectionXYZ, RealCoords)
+            proj_coords = direction_proj(RealCoords, maindirectionXYZ)
 
             bins = int(0.8 * proj_coords.size)
             bins = bins if bins >= 50 else 50
@@ -309,18 +302,10 @@ def find_planes(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
             #            to_delete = numpy.concatenate([numpy.arange(fourier.size)[::peak+i] for i in range(-(fourier.size//100), (fourier.size//100)+1)])
             #            noise_regions = numpy.delete(numpy.arange(fourier.size), to_delete)
             noise_regions = numpy.arange(fourier.size)[fourier <= numpy.median(fourier)]
-            noise_regions = numpy.arange(fourier.size)[
-                fourier <= numpy.median(fourier) + noise_regions.std()
-            ]
+            noise_regions = numpy.arange(fourier.size)[fourier <= numpy.median(fourier) + noise_regions.std()]
             noise = fourier[noise_regions]
-
-            plt.title(
-                "Find: Fourier components for direction {0:.1f} {1:.1f} {2:.1f}".format(
-                    *list(w * maindirectionXYZ[:3])
-                )
-                + ", coords size {0}, bins {1}".format(proj_coords.size, bins)
-            )
             frequences = numpy.pi * numpy.arange(fourier.size) / (h[1][-1] - h[1][0])
+            
             if DO_PLOT:
                 plt.plot(frequences[frequences < 1500], fourier[frequences < 1500])
                 plt.plot(
@@ -328,6 +313,12 @@ def find_planes(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
                     noise[frequences[noise_regions] < 1500],
                     c="red",
                 )
+                plt.title(
+                "Find: Fourier components for direction {0:.1f} {1:.1f} {2:.1f}".format(
+                    *list(w * maindirectionXYZ[:3])
+                )
+                + ", coords size {0}, bins {1}".format(proj_coords.size, bins)
+                )   
                 plt.xlabel(r"$\AA$")
                 plt.show()
 
@@ -345,16 +336,13 @@ def find_planes(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
 
 def check(RealCoords, plane_vector):
     freq = numpy.linalg.norm(plane_vector[:3])
-    #    if freq>300:
-    #        logger.debug('Detected large cell parameter ({0:.2f}'.format(freq)+u'\u212B'+
-    #                    '): vector {0} with confidence score {1:.2f}'.format(plane_vector[:3], plane_vector[3]))
-    #        logger.debug('No trust to this one')
     direction = plane_vector[:3] / freq
-    proj_coords = direction_proj(direction, RealCoords)
+    proj_coords = direction_proj(RealCoords, direction)
     n_peak = int(freq * (proj_coords.max() - proj_coords.min()) / numpy.pi)
     n_peak = n_peak if n_peak > 2 else 2
 
     bins = int(max(0.1 * proj_coords.size, 100, 4 * n_peak))
+    
     logger.debug("Number of bins: {}".format(bins))
 
     h = numpy.histogram(proj_coords, bins=bins)
@@ -405,7 +393,7 @@ def check(RealCoords, plane_vector):
         "Check: Fourier components for direction {0:.1f} {1:.1f} {2:.1f}".format(
             *list(plane_vector[:3])
         )
-        + ", coords size {0}, bins {1}".format(proj_coords.size, bins)
+        + ", coords size {0}, bins {1}, fourier size {2}".format(proj_coords.size, bins, fourier.size)
     )
     frequences = numpy.pi * numpy.arange(fourier.size) / (h[1][-1] - h[1][0])
     if DO_PLOT:
@@ -429,7 +417,7 @@ def check(RealCoords, plane_vector):
 
 
 def crosscheck2patterns(
-    spots1, spots2, angle_delta, BeamCenter, Wavelength, DetectorDistance, DetectorPixel
+    spots1, spots2, angle_delta, BeamCenter, Wavelength, DetectorDistance, DetectorPixel, spots_in3D=False
 ):
 
     v1, RealCoords1 = find_planes(
@@ -438,6 +426,7 @@ def crosscheck2patterns(
         Wavelength=Wavelength,
         DetectorDistance=DetectorDistance,
         DetectorPixel=DetectorPixel,
+        spots_in3D=spots_in3D
     )
     [
         logger.debug(
@@ -452,6 +441,7 @@ def crosscheck2patterns(
         Wavelength=Wavelength,
         DetectorDistance=DetectorDistance,
         DetectorPixel=DetectorPixel,
+        spots_in3D=spots_in3D
     )
     [
         logger.debug(
@@ -463,14 +453,14 @@ def crosscheck2patterns(
     matches = []
     conf = []
     for i in v1:
-        newi = rotate_vector(i[:3], numpy.array([1.0, 0.0, 0.0]), angle_delta)
+        newi = rotate_vector(i[:3], numpy.array([1.0, 0.0, 0.0]), -angle_delta)
         newi = numpy.hstack((newi, i[3]))
         chck = check(RealCoords2, newi)
         matches.append(chck)
         conf.append(newi[3])
 
     for i in v2:
-        newi = rotate_vector(i[:3], numpy.array([1.0, 0.0, 0.0]), -angle_delta)
+        newi = rotate_vector(i[:3], numpy.array([1.0, 0.0, 0.0]), angle_delta)
         newi = numpy.hstack((newi, i[3]))
         chck = check(RealCoords1, newi)
         matches.append(chck)
@@ -479,251 +469,42 @@ def crosscheck2patterns(
     matches = numpy.asarray(matches)
     conf = numpy.asarray(conf)
 
-    #    conf = sigmoid1(conf)
-
-    #    return numpy.multiply(matches, conf).mean()
-
-    return sigmoid(numpy.sum(matches * numpy.exp(conf)) / numpy.exp(conf).sum())
+    return sigmoid(numpy.sum(matches * numpy.exp(conf)) / numpy.exp(conf).sum()), conf.mean()
 
 
+def refine_lattice_vector(RealCoords, plane_vector):
+    original = xyzToSpherical(plane_vector[:3])
+    maindirection = original[1:3]
+    boundary = 0.01
+    bining = 11
+    
+    p = numpy.linspace(maindirection[1] - boundary, maindirection[1] + boundary, bining)
+    t = numpy.linspace(maindirection[0] - boundary, maindirection[0] + boundary, bining)
 
-
-
-def sphToXYZ(spherical):
-    xyz = numpy.zeros(spherical.shape)
-    xyz[:, 2] = numpy.cos(spherical[:, 0]) / spherical[:, 1]
-    xyz[:, 0] = (
-        numpy.sin(spherical[:, 0]) * numpy.cos(spherical[:, 2]) / spherical[:, 1]
-    )
-    xyz[:, 1] = (
-        numpy.sin(spherical[:, 0]) * numpy.sin(spherical[:, 2]) / spherical[:, 1]
-    )
-    return xyz
-
-
-def normale(spots, BeamCenter, Wavelength, DetectorDistance, DetectorPixel):
-    #    st = time.time()
-    RealCoords = numpy.zeros((numpy.shape(spots)[0], 3))
-
-    x = (spots[:, 1] - BeamCenter[0]) * DetectorPixel
-    y = (spots[:, 2] - BeamCenter[1]) * DetectorPixel
-    divider = Wavelength * numpy.sqrt(x**2 + y**2 + DetectorDistance**2)
-    RealCoords[:, 0] = x / divider
-    RealCoords[:, 1] = y / divider
-    RealCoords[:, 2] = (1 / Wavelength) - DetectorDistance / divider
-
-    bining = 40
-
-    normales = numpy.array(
-        numpy.meshgrid(
-            numpy.linspace(0.0, 3.14, bining),
-            numpy.logspace(-3, -1, 2 * bining, base=10),
-            numpy.linspace(0.0, 3.14, bining),
-        )
-    )
-
-    normales = normales.reshape((3, 2 * bining**3)).T
-    spherical = numpy.copy(normales)
-    # if DO_PLOT:
-    #    plt.plot(normales[:, 1])
-    #    plt.show()
-
-    normales = sphToXYZ(normales)
-
-    NCT = numpy.dot(RealCoords, normales.T)
-    NCT_Z = numpy.round(numpy.copy(NCT))
-
-    cost = numpy.sum(numpy.abs(NCT - NCT_Z), axis=0)
-
-    c = 10
-    cost -= numpy.convolve(cost, numpy.ones(c), "same") / c
-    thr = numpy.percentile(cost, 0.01)
-
-    points = numpy.where(cost < thr)[0]
-
-    clusters = distance.pdist(spherical[:, ::2][points], metric="euclidean")
-
-    #    print(distance.squareform(clusters))
-    #    print(spherical[:, :][points])
-
+    Z = numpy.zeros((bining, bining))
+    for i, j in numpy.ndindex((bining, bining)):
+        Z[i, j] = alignment_score((t[i], p[j]), RealCoords)
     if DO_PLOT:
-        plt.imshow(distance.squareform(clusters), cmap="hot")
+        plt.imshow(Z, cmap="hot", interpolation="nearest", origin="lower", extent=[p.min(), p.max(), t.min(), t.max()])
         plt.colorbar()
         plt.show()
+    
+    refine_peak = find_peaks2D(Z, onepeak=True)
+    logger.debug("Refined peak: {}".format(refine_peak))
 
-    Z = hierarchy.linkage(clusters, method="single", metric="euclidean")
-
-    hierarchy.dendrogram(Z, color_threshold=0.5)
-
-    F = hierarchy.fcluster(Z, t=0.2, criterion="distance")
-    # if DO_PLOT:
-    #   plt.show()
-    #   print(F)
-
-    if DO_PLOT:
-        plt.plot(cost)
-        plt.scatter(points, cost[points], marker="o", c="red")
-        plt.show()
-
-    #    print("{0}Main part finished in {1:.2f} s{2}".format(color.BOLD, (time.time()-st), color.END))
-
-    vectors = []
-    #    for centre in spherical[points]:
-    for i in numpy.unique(F):
-        centre = spherical[points[F == i]].mean(axis=0)
-        #        print(centre)
-
-        #        bining = 41
-        #        boundary = 0.01
-        #        mesh = numpy.array(numpy.meshgrid(numpy.linspace(centre[0]-boundary, centre[0]+boundary, bining),
-        #                                          numpy.linspace(centre[1]-boundary, centre[1]+boundary, bining),
-        #                                          numpy.linspace(centre[2]-boundary, centre[2]+boundary, bining)))
-        #        mesh = mesh.reshape((3, bining**3)).T
-        #        mesh = sphToXYZ(mesh)
-        #
-        #        NCT = numpy.dot(RealCoords, mesh.T)
-        #        NCT_Z = numpy.round(numpy.copy(NCT))
-        #
-        #        cost = numpy.sum(numpy.abs(NCT - NCT_Z), axis=0)
-        #        cost -= numpy.convolve(cost, numpy.ones(c), 'same')/c
-        # if DO_PLOT:
-        #        plt.plot(cost)
-        # #       plt.scatter(points, cost[points], marker='o', c='red')
-        #        plt.show()
-
-        maindirection = (centre[0], centre[2])  # theta, phi
-        logger.debug(
-            "Main direction unrefined: phi={0:.2f}, theta={1:.2f}".format(
-                maindirection[1], maindirection[0]
-            )
-        )
-
-        bining = 20
-        boundary = 0.05
-
-        p = numpy.linspace(
-            maindirection[1] - boundary, maindirection[1] + boundary, bining
-        )
-        t = numpy.linspace(
-            maindirection[0] - boundary, maindirection[0] + boundary, bining
-        )
-
-        Z = numpy.zeros((bining, bining))
-        for i, j in numpy.ndindex((bining, bining)):
-            Z[i, j] = alignment_score((t[i], p[j]), RealCoords)
-        if DO_PLOT:
-            plt.imshow(
-                Z,
-                cmap="hot",
-                interpolation="nearest",
-                origin="lower",
-                extent=[p.min(), p.max(), t.min(), t.max()],
-            )
-            plt.colorbar()
-            plt.show()
-        refine_peak = find_peaks2D(Z, onepeak=True)
-        logger.debug("Refined peak: {}".format(refine_peak))
-        #        print(Z[refine_peak[0]])
-
-        maindirection = t[refine_peak[0][0]], p[refine_peak[0][1]]
-
-        # iteration
-        bining = 10
-        boundary = 0.01
-
-        p = numpy.linspace(
-            maindirection[1] - boundary, maindirection[1] + boundary, bining
-        )
-        t = numpy.linspace(
-            maindirection[0] - boundary, maindirection[0] + boundary, bining
-        )
-
-        Z = numpy.zeros((bining, bining))
-        for i, j in numpy.ndindex((bining, bining)):
-            Z[i, j] = alignment_score((t[i], p[j]), RealCoords)
-        if DO_PLOT:
-            plt.imshow(
-                Z,
-                cmap="hot",
-                interpolation="nearest",
-                origin="lower",
-                extent=[p.min(), p.max(), t.min(), t.max()],
-            )
-            plt.colorbar()
-            plt.show()
-        refine_peak = find_peaks2D(Z, onepeak=True)
-        logger.debug("Refined peak: {}".format(refine_peak))
-        #        print(Z[refine_peak[0]])
-
-        maindirection = t[refine_peak[0][0]], p[refine_peak[0][1]]
-
-        bining = 10
-        boundary = 0.001
-
-        p = numpy.linspace(
-            maindirection[1] - boundary, maindirection[1] + boundary, bining
-        )
-        t = numpy.linspace(
-            maindirection[0] - boundary, maindirection[0] + boundary, bining
-        )
-
-        Z = numpy.zeros((bining, bining))
-        for i, j in numpy.ndindex((bining, bining)):
-            Z[i, j] = alignment_score((t[i], p[j]), RealCoords)
-        if DO_PLOT:
-            plt.imshow(
-                Z,
-                cmap="hot",
-                interpolation="nearest",
-                origin="lower",
-                extent=[p.min(), p.max(), t.min(), t.max()],
-            )
-            plt.colorbar()
-            plt.show()
-        refine_peak = find_peaks2D(Z, onepeak=True)
-        logger.debug("Refined peak: {}".format(refine_peak))
-        #        print(Z[refine_peak[0]])
-
-        maindirection = t[refine_peak[0][0]], p[refine_peak[0][1]]
-        logger.debug(
-            "Main direction refined: phi={0:.2f}, theta={1:.2f}".format(
-                maindirection[1], maindirection[0]
-            )
-        )
-
-        maindirectionXYZ = backToXYZ(
-            numpy.array([1.0, maindirection[0], maindirection[1]])
-        )
-        proj_coords = direction_proj(maindirectionXYZ, RealCoords)
-
-        bins = int(0.8 * proj_coords.size)
-        bins = bins if bins >= 50 else 50
-        dens = numpy.histogram(proj_coords, bins=bins)[0].astype(float)
-        if DO_PLOT:
-            plt.plot(dens)
-            plt.show()
-        dens -= ndimage.gaussian_filter1d(dens, sigma=0.05 * proj_coords.size)
-        dens -= numpy.mean(dens)
-        fourier = numpy.abs(numpy.fft.rfft(dens))
-        if DO_PLOT:
-            plt.plot(fourier)
-            plt.show()
-
-        peak = int(numpy.argmax(fourier))
-        w = numpy.pi * peak / (proj_coords.max() - proj_coords.min())
-        noise = fourier[
-            numpy.delete(numpy.arange(fourier.size), numpy.arange(fourier.size)[::peak])
-        ]
-        score = (fourier[peak] - noise.mean()) / (5 * noise.std())
-
-        logger.debug("Score for direction: {:.2f}".format(score))
-        if score >= 1:
-            vectors.append(numpy.hstack((w * maindirectionXYZ, score)))
-        else:
-            logger.debug(
-                "Score is too low, aborting this direction: {:.2f}".format(score)
-            )
-
-    return vectors, RealCoords
-
-
+    newmaindirection = t[refine_peak[0][0]], p[refine_peak[0][1]]
+    logger.debug("Main direction unrefined: phi={0:.2f}, theta={1:.2f}".format(maindirection[1], maindirection[0]))
+    logger.debug("Main direction refined: phi={0:.2f}, theta={1:.2f}".format(newmaindirection[1], newmaindirection[0]))
+    
+#    delta = numpy.sqrt(((newmaindirection-maindirection)**2).sum())
+    delta = newmaindirection-maindirection
+    logger.debug("Delta=({0:.3f}, {1:.3f})".format(delta[0], delta[1]))
+    
+    refinedXYZ = sphericalToXYZ(numpy.array([original[0], newmaindirection[0], newmaindirection[1]]))
+    
+    logger.debug("Original plane vector: {0:.1f} {1:.1f} {2:.1f}".format(*list(plane_vector[:3])))
+    logger.debug("Refined plane vector: {0:.1f} {1:.1f} {2:.1f}".format(*list(refinedXYZ)))
+    newratio = check(RealCoords, refinedXYZ)
+    
+    return delta, newratio
+    
