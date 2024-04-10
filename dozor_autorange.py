@@ -437,7 +437,7 @@ def selftest():
 
 
 
-selftest()
+#selftest()
 
 
 
