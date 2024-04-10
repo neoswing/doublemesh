@@ -26,7 +26,7 @@ except ModuleNotFoundError:
 
 
 stddc = False
-path = '/data/id23eh1/inhouse/opid231/20240208/PROCESSED_DATA/LYS/LYS-Lys_03/run_01_MXPressE/'
+#path = '/data/id23eh1/inhouse/opid231/20240208/PROCESSED_DATA/LYS/LYS-Lys_03/run_01_MXPressE/'
 
 #path = '/data/id23eh1/inhouse/opid231/20240301/PROCESSED_DATA/2MESH_TEST_OA14/Sample-3:1:04/run_01_MXPressF/'
 
