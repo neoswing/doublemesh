@@ -25,14 +25,14 @@ except ModuleNotFoundError:
     import multiprocessing as mp
 
 
-matplotlib.use("Agg")
+#matplotlib.use("Agg")
 from matplotlib import pyplot as plt  # Noqa E402
 
 
-__version__ = "1.9"
+__version__ = "2.0"
+"""new estimation protocol for crystal matching"""
 
-'''added crystal pair ranking by dozor score half-sum'''
-
+"""added crystal pair ranking by dozor score half-sum"""
 """added output as first position in case no matches have been found"""
 """added version notice"""
 """small bug fixes"""
@@ -49,7 +49,7 @@ def extractDozorMetadata(datfilename):
         import logging
 
         logger = logging.getLogger("test")
-        logger.setLevel(logging.DEBUG)
+        logger.setLevel(logging.INFO)
 
     with open(datfilename, "r") as metadata:
         lines = metadata.readlines()
@@ -285,17 +285,43 @@ def analyseDoubleMeshscan(path):
 
         matches = numpy.asarray(matches)
         conf = numpy.asarray(conf)
-        #        conf = lattice_vector_search.sigmoid1(conf)
-        #        line[4] = numpy.multiply(matches, conf).mean()
-        line[4] = lattice_vector_search.sigmoid(
-            numpy.sum(matches * numpy.exp(conf)) / numpy.exp(conf).sum()
-        )
-        line[5] = conf.mean()
+        
+        logp_val = numpy.min([matches, conf], axis=0)
+        if matches.size>0:
+            logger.debug(
+            (
+                "Match scores: {"
+                + ":.3f} {".join(numpy.arange(matches.size).astype(str))
+                + ":.3f}"
+            ).format(*list(matches))
+            )
+            logger.debug(
+            (
+                "Conf scores: {"
+                + ":.3f} {".join(numpy.arange(conf.size).astype(str))
+                + ":.3f}"
+            ).format(*list(conf))
+            )
+            logger.debug(
+            (
+                "Pval scores: {"
+                + ":.3f} {".join(numpy.arange(logp_val.size).astype(str))
+                + ":.3f}"
+            ).format(*list(logp_val))
+            )
+
+        result = logp_val.max() if logp_val.size>0 else 0.0
+        result_conf = conf[logp_val.argmax()] if conf.size>0 else 0.5
+        
+        logger.debug("Final logpval: {:.5f}".format(result))
+        logger.debug("Final conf: {:.5f}".format(result_conf))
+        line[4] = result
+        line[5] = result_conf
 
     potentialMatches = numpy.hstack(
         (
             potentialMatches,
-            (potentialMatches[:, 4] > 0.5).reshape(potentialMatches.shape[0], 1),
+            (potentialMatches[:, 4] > 13).reshape(potentialMatches.shape[0], 1),
         )
     )
 
@@ -309,7 +335,7 @@ def analyseDoubleMeshscan(path):
 
         verified = verified[verified[:, 6].astype(bool)]
         if verified.size > 0:
-            candidates = verified[verified[:, 4]>=verified[:, 4].max()-0.05]
+            candidates = verified[verified[:, 4]>=verified[:, 4].max()-1.0]
             x = verified[numpy.argmax(candidates[:, 3]), 0].astype(int) - 1
         else:
             break
@@ -342,17 +368,17 @@ def analyseDoubleMeshscan(path):
 
 
     logger.info(
-        "Case# | Xtal1 | Xtal2 | DozorScore | MatchPb | Confidence | Y/N | Collect? | Resolution | Beam size |        Center command  "
+        "Case# | Xtal1 | Xtal2 | DozorScore | -LogPval | Confidence | Y/N | Collect? | Resolution | Beam size |        Center command  "
     )
     for item in potentialMatches:
         logger.info(
-            "{0:3.0f}   | {1:3.0f}   | {2:3.0f}   |  {3:>7s}   |  {4:1.2f}   |  {5:>7s}   |  {6}  |    {7}     |    {8:.2f}    |     {9:3.0f}   |  {10} ".format(
+            "{0:3.0f}   | {1:3.0f}   | {2:3.0f}   |  {3:>7s}   |{4:>7s}   |  {5:>7s}   |  {6}  |    {7}     |    {8:.2f}    |     {9:3.0f}   |  {10} ".format(
                 item[0],
                 item[1],
                 item[2],
                 format(item[3], "4.2f"),
-                item[4],
-                format(item[5], "4.2f"),
+                format(item[4], "4.0f"),
+                format(item[5], "4.0f"),
                 "Y" if item[6].astype(bool) else "N",
                 "Y" if item[7].astype(bool) else " ",
                 item[8],
