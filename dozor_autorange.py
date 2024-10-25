@@ -25,16 +25,7 @@ except ModuleNotFoundError:
     import multiprocessing as mp
 
 
-stddc = False
-#path = '/data/id23eh1/inhouse/opid231/20240208/PROCESSED_DATA/LYS/LYS-Lys_03/run_01_MXPressE/'
 
-#path = '/data/id23eh1/inhouse/opid231/20240301/PROCESSED_DATA/2MESH_TEST_OA14/Sample-3:1:04/run_01_MXPressF/'
-
-#path = '/data/id23eh1/inhouse/opid231/20240213/PROCESSED_DATA/Tryp/Tryp-Tryp01/run_03_MXPressF/'
-
-#path = '/data/id23eh1/inhouse/opid231/20240301/PROCESSED_DATA/2MESH_TEST_OA14/Sample-1:2:10/run_01_MXPressF/'
-    
-#path, stddc = '/data/visitor/mx2607/id30a3/20240309/PROCESSED_DATA/JP-Lab/scTrl1/scTrl1-SK202/', True
 
 DO_PLOT = True
 DSCORE_THRESHOLD = 0.2
@@ -52,25 +43,22 @@ except Exception:
     logger.setLevel(logging.DEBUG)
 
 
-def createjson(path, stddc=False):
+def createjson(path, mxpress=False):
 #    st = time.time()
-    if stddc:
+    if not mxpress:
         temp = glob.glob(path+'autoprocessing_'+path.split('/')[-2]+'*/dozor/ControlDozor_*')[0]
     else:
-        temp = glob.glob(path+'run_*_datacollection/autoprocessing_*_1/dozor/nobackup/ImageQualityIndicators_????????')[0]
-#    print(temp)
-    
-    pixelsize = 0.075
+        temp = glob.glob(path+'run_*_datacollection/autoprocessing*/dozor/nobackup/ImageQualityIndicators_????????')[0]
     
     inmeta = glob.glob(temp+'/ControlDozor_*/ExecDozor_*/inDataExecDozor.json')[0]
-    
+#    print('Checkpoint1: {:.2f} s'.format((time.time()-st)))
     with open(inmeta, 'r') as j:
         JSON = json.load(j)
         j.close()
-#    print('Checkpoint1: {:.2f} s'.format((time.time()-st)))
-    JSON['detectorPixelSize'] = pixelsize
-    
-    if stddc:
+
+    JSON['detectorPixelSize'] = 0.075 if 'eiger' in JSON['detectorType'] else 0.15
+
+    if not mxpress:
         with open(temp+'/outDataControlDozor.json', 'r') as j:
             JSON2 = json.load(j)
             j.close()
@@ -219,7 +207,7 @@ def checkLatticeMisorientation(jsondata, spot_range1, spot_range2=None):
     
     check = lattice_vector_search.crosscheck2patterns(RealCoords1, RealCoords2, angle_delta12, BeamCenter,
                                                       Wavelength, DetectorDistance, DetectorPixel, spots_in3D=True)
-    
+    logger.info('Lattice orientation check results: -logpval={:.0f}; confidence={:.0f}'.format(check[0], check[1]))
     return check
 
 def quickrunMCD(jsondata):
@@ -255,7 +243,7 @@ def bestPartForIndexing(jsondata, doLatticeCheck=False):
     
     if doLatticeCheck:
         check = checkLatticeMisorientation(jsondata, result[0], spot_range2=(None if len(result)<2 else result[1]))
-        if check[0]<0.5 and check[1]<2:
+        if check[0]<5 or check[1]<5:
             logger.info('Detected misorientation in lattice over the data set!')
     return result
 
@@ -294,52 +282,7 @@ def bestPartForIntegration(jsondata, cutoff=2e-4, minosc=20, doLatticeCheck=Fals
         
         return [start[-1], start[-1]+width[-1]]
 
-def selftest():
-    numpy.random.seed(1)
-    
-    start = time.time()
-    
-    j = createjson(path, stddc=stddc)
-    
-    logger.info('Json loading - Elapsed: {:.2f} s'.format((time.time()-start)))
-    start = time.time()
-    logger.info('Starting MCD')
-    
-    rings.removeSaltRings(j)
-    
-    dvanalysis.determineMCD(j)
-    
-    dscore = [item['dozorScore'] for item in j['imageQualityIndicators']]
-    dscore = numpy.array(dscore).astype(float)
-    j['dozorScoreArray'] = base64.b64encode(dscore).decode()
-    
-    logger.info('MCD analysis - Elapsed: {:.2f} s'.format((time.time()-start)))
-    start = time.time()
-    
-    n = bestPartForIndexing(j,
-#                            doLatticeCheck=True
-                            )
-    logger.info('Useful range for indexing: ' + '; '.join(['-'.join(i.astype(str)) for i in numpy.array(n)]))
-    logger.info('Autorange for indexing intervals - Elapsed: {:.2f} s'.format((time.time()-start)))
-    start = time.time()
-    
-    f = bestPartForIntegration(j)
-    logger.info(f)
-    logger.info('Autorange for integration intervals - Elapsed: {:.2f} s'.format((time.time()-start)))
-    
-#    plt.plot(dscore, c='indigo')
-#    for i in n:
-#        plt.axvspan(i[0], i[1], alpha=0.5, color='red')
-#    plt.title('dozor score')
-#    plt.show()
-    
-    mcdarray = numpy.copy(numpy.frombuffer(base64.b64decode(j['MCDArray'])))
-    plt.plot(mcdarray)
-    for i in n:
-        plt.axvspan(i[0], i[1], alpha=0.5, color='red')
-    plt.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
-    plt.title('mcd_score')
-    plt.show()
+
 
 #def check_MPwrapper(queue):
 #    global Buffer
@@ -437,10 +380,58 @@ def selftest():
 
 
 
-#selftest()
+
+def main(path, mxpress, cutoff=2e-4, minosc=20, doLatticeCheck=True):
+    numpy.random.seed(1)
+    
+    start = time.time()
+    
+    j = createjson(path, mxpress=mxpress)
+    
+    logger.info('Json loading - Elapsed: {:.2f} s'.format((time.time()-start)))
+    start = time.time()
+    logger.info('Starting MCD')
+    
+    rings.removeSaltRings(j)
+    dvanalysis.determineMCD(j)
+    
+    dscore = [item['dozorScore'] for item in j['imageQualityIndicators']]
+    dscore = numpy.array(dscore).astype(float)
+    j['dozorScoreArray'] = base64.b64encode(dscore).decode()
+    
+    logger.info('MCD analysis - Elapsed: {:.2f} s'.format((time.time()-start)))
+    start = time.time()
+    
+    n = bestPartForIndexing(j,
+                            doLatticeCheck=doLatticeCheck
+                            )
+    logger.info('Useful range for indexing: ' + '; '.join(['-'.join(i.astype(str)) for i in numpy.array(n)]))
+    logger.info('Autorange for indexing intervals - Elapsed: {:.2f} s'.format((time.time()-start)))
+    start = time.time()
+    
+    f = bestPartForIntegration(j, cutoff=cutoff, minosc=minosc)
+    logger.info(f)
+    logger.info('Autorange for integration intervals - Elapsed: {:.2f} s'.format((time.time()-start)))
+    
+    mcdarray = numpy.copy(numpy.frombuffer(base64.b64decode(j['MCDArray'])))
+    plt.plot(mcdarray)
+    for i in n:
+        plt.axvspan(i[0], i[1], alpha=0.5, color='red')
+    plt.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
+    plt.title('mcd_score')
+    plt.savefig('dozor_autorange.png', dpi=75)
+    
+    
+    '''To fix that potentially Integration region may be smaller than the one for Indexing, XDS does not like it...'''
+    if n[0][0]<f[0] or n[1][1]>f[1]:
+        f[0] = n[0][0]
+        f[1] = n[1][1]
+
+    return n, f
 
 
 
-
+if __name__ == "__main__":
+    main()
 
 
